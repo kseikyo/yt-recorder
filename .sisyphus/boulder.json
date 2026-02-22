@@ -4,8 +4,8 @@
   "session_ids": ["ses_378839912ffed7CLQm1tKMqH4e"],
   "plan_name": "v0.2-finish-and-ship",
   "progress": {
-    "completed": ["A1", "A2", "A3"],
+    "completed": ["A1", "A2", "A3", "B1", "B2"],
     "in_progress": [],
-    "remaining": ["B1", "B2", "B3", "C1", "C2"]
+    "remaining": ["B3", "C1", "C2"]
   }
 }
