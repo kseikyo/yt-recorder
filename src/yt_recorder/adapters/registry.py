@@ -14,7 +14,14 @@ from yt_recorder.domain.exceptions import (
     RegistryParseError,
     RegistryWriteError,
 )
-from yt_recorder.domain.models import RegistryEntry
+from yt_recorder.domain.models import RegistryEntry, TranscriptStatus
+
+_REGISTRY_VERSION = 2
+_VERSION_COMMENT = "<!-- registry_version: 2 -->"
+_V1_TRANSCRIPT_MAP: dict[str, TranscriptStatus] = {
+    "✅": TranscriptStatus.DONE,
+    "❌": TranscriptStatus.PENDING,
+}
 
 
 class MarkdownRegistryStore:
@@ -120,12 +127,12 @@ class MarkdownRegistryStore:
         except (OSError, UnicodeDecodeError) as e:
             raise RegistryWriteError(f"Failed to append entry: {e}") from e
 
-    def update_transcript(self, file: str, status: bool) -> None:
+    def update_transcript(self, file: str, status: TranscriptStatus) -> None:
         """Update transcript status for a file.
 
         Args:
             file: Relative file path
-            status: True if transcript available, False otherwise
+            status: TranscriptStatus enum value
 
         Raises:
             RegistryWriteError: If update fails
@@ -141,7 +148,7 @@ class MarkdownRegistryStore:
                             file=entry.file,
                             playlist=entry.playlist,
                             uploaded_date=entry.uploaded_date,
-                            has_transcript=status,
+                            transcript_status=status,
                             account_ids=entry.account_ids,
                         )
                         updated = True
@@ -177,7 +184,7 @@ class MarkdownRegistryStore:
                         file=entry.file,
                         playlist=entry.playlist,
                         uploaded_date=entry.uploaded_date,
-                        has_transcript=entry.has_transcript,
+                        transcript_status=entry.transcript_status,
                         account_ids=new_ids,
                     )
                     self._write_all(entries)
@@ -195,7 +202,10 @@ class MarkdownRegistryStore:
                         file=entry.file,
                         playlist=entry.playlist,
                         uploaded_date=entry.uploaded_date,
-                        has_transcript=fields.get("has_transcript", entry.has_transcript),
+                        transcript_status=fields.get(
+                            "transcript_status",
+                            entry.transcript_status,
+                        ),
                         account_ids=fields.get("account_ids", entry.account_ids),
                     )
             self._write_all(entries)
@@ -241,7 +251,7 @@ class MarkdownRegistryStore:
         """Create empty registry file with header."""
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
 
-        header = "# Recordings Registry\n\n"
+        header = f"# Recordings Registry\n\n{_VERSION_COMMENT}\n\n"
         table_header = self._format_table_header()
         separator = self._format_separator()
 
@@ -272,14 +282,13 @@ class MarkdownRegistryStore:
 
     def _format_row(self, entry: RegistryEntry) -> str:
         """Format registry entry as markdown table row."""
-        transcript_mark = "✅" if entry.has_transcript else "❌"
         account_values = [entry.account_ids.get(name, "—") for name in self.account_names]
 
         values = [
             entry.file,
             entry.playlist,
             entry.uploaded_date.isoformat(),
-            transcript_mark,
+            entry.transcript_status.value,
             *account_values,
         ]
 
@@ -306,14 +315,14 @@ class MarkdownRegistryStore:
         file_path = parts[0]
         playlist = parts[1]
         uploaded_str = parts[2]
-        transcript_mark = parts[3]
+        transcript_raw = parts[3]
 
         try:
             uploaded_date = date.fromisoformat(uploaded_str)
         except ValueError as e:
             raise ValueError(f"Invalid date format: {uploaded_str}") from e
 
-        has_transcript = transcript_mark == "✅"
+        transcript_status = self._parse_transcript_status(transcript_raw)
 
         account_ids: dict[str, str] = {}
         for i, account_name in enumerate(self.account_names):
@@ -324,13 +333,23 @@ class MarkdownRegistryStore:
             file=file_path,
             playlist=playlist,
             uploaded_date=uploaded_date,
-            has_transcript=has_transcript,
+            transcript_status=transcript_status,
             account_ids=account_ids,
         )
 
+    @staticmethod
+    def _parse_transcript_status(raw: str) -> TranscriptStatus:
+        """Parse v1 emoji or v2 string into TranscriptStatus."""
+        if raw in _V1_TRANSCRIPT_MAP:
+            return _V1_TRANSCRIPT_MAP[raw]
+        try:
+            return TranscriptStatus(raw)
+        except ValueError:
+            raise RegistryParseError(f"Unknown transcript status: {raw!r}") from None
+
     def _write_all(self, entries: list[RegistryEntry]) -> None:
         """Write all entries to registry (overwrites existing)."""
-        header = "# Recordings Registry\n\n"
+        header = f"# Recordings Registry\n\n{_VERSION_COMMENT}\n\n"
         table_header = self._format_table_header()
         separator = self._format_separator()
 

@@ -9,9 +9,10 @@ import pytest
 from yt_recorder.adapters.registry import MarkdownRegistryStore
 from yt_recorder.domain.exceptions import (
     RegistryFileNotFoundError,
+    RegistryParseError,
     RegistryWriteError,
 )
-from yt_recorder.domain.models import RegistryEntry
+from yt_recorder.domain.models import RegistryEntry, TranscriptStatus
 
 
 @pytest.fixture
@@ -32,7 +33,7 @@ class TestRegistryEntry:
             file="folder-a/video1.mp4",
             playlist="folder-a",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=True,
+            transcript_status=TranscriptStatus.DONE,
             account_ids={"primary": "abc123", "mirror-1": "xyz789"},
         )
 
@@ -47,7 +48,7 @@ class TestRegistryEntry:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={},
         )
 
@@ -69,7 +70,7 @@ class TestMarkdownRegistryStore:
             file="folder-a/video1.mp4",
             playlist="folder-a",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=True,
+            transcript_status=TranscriptStatus.DONE,
             account_ids={"primary": "abc123", "mirror-1": "xyz789"},
         )
 
@@ -80,21 +81,21 @@ class TestMarkdownRegistryStore:
         assert "folder-a/video1.mp4" in content
         assert "abc123" in content
         assert "xyz789" in content
-        assert "✅" in content
+        assert "done" in content
 
     def test_load_entries(self, registry_store: MarkdownRegistryStore) -> None:
         entry1 = RegistryEntry(
             file="folder-a/video1.mp4",
             playlist="folder-a",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=True,
+            transcript_status=TranscriptStatus.DONE,
             account_ids={"primary": "abc123", "mirror-1": "xyz789"},
         )
         entry2 = RegistryEntry(
             file="folder-b/video2.mp4",
             playlist="folder-b",
             uploaded_date=date(2026, 1, 16),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "def456"},
         )
 
@@ -118,7 +119,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
 
@@ -137,7 +138,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123", "mirror-1": "xyz789"},
         )
 
@@ -153,7 +154,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123", "mirror-1": "—"},
         )
 
@@ -167,12 +168,12 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
 
         registry_store.append(entry)
-        registry_store.update_transcript("video.mp4", True)
+        registry_store.update_transcript("video.mp4", TranscriptStatus.DONE)
 
         entries = registry_store.load()
         assert entries[0].has_transcript is True
@@ -182,14 +183,14 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
 
         registry_store.append(entry)
 
         with pytest.raises(RegistryWriteError):
-            registry_store.update_transcript("other.mp4", True)
+            registry_store.update_transcript("other.mp4", TranscriptStatus.DONE)
 
     def test_round_trip_variable_columns(self, temp_registry_dir: Path) -> None:
         registry_path = temp_registry_dir / "registry.md"
@@ -199,7 +200,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=True,
+            transcript_status=TranscriptStatus.DONE,
             account_ids={"primary": "abc123", "mirror-1": "xyz789"},
         )
 
@@ -218,14 +219,14 @@ class TestMarkdownRegistryStore:
             file="folder-a/video.mp4",
             playlist="folder-a",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
         entry2 = RegistryEntry(
             file="folder-b/video.mp4",
             playlist="folder-b",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "def456"},
         )
 
@@ -243,7 +244,7 @@ class TestMarkdownRegistryStore:
             file="video1.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
 
@@ -254,7 +255,7 @@ class TestMarkdownRegistryStore:
             file="video2.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 16),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "def456"},
         )
 
@@ -275,7 +276,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=True,
+            transcript_status=TranscriptStatus.DONE,
             account_ids={
                 "primary": "id1",
                 "mirror-1": "id2",
@@ -297,7 +298,7 @@ class TestMarkdownRegistryStore:
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123", "mirror-1": "—"},
         )
         registry_store.append(entry)
@@ -309,16 +310,147 @@ class TestMarkdownRegistryStore:
         assert entries[0].account_ids["primary"] == "abc123"
 
     def test_update_account_id_nonexistent(
-        self, registry_store: MarkdownRegistryStore,
+        self,
+        registry_store: MarkdownRegistryStore,
     ) -> None:
         entry = RegistryEntry(
             file="video.mp4",
             playlist="root",
             uploaded_date=date(2026, 1, 15),
-            has_transcript=False,
+            transcript_status=TranscriptStatus.PENDING,
             account_ids={"primary": "abc123"},
         )
         registry_store.append(entry)
 
         with pytest.raises(RegistryWriteError):
             registry_store.update_account_id("other.mp4", "primary", "new123")
+
+
+class TestRegistryMigration:
+    def test_parse_v1_emoji_done(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        v1_content = (
+            "# Recordings Registry\n\n"
+            "| File | Playlist | Uploaded | Transcript | primary |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| vid.mp4 | folder | 2025-01-20 | ✅ | abc123 |\n"
+        )
+        registry_path.write_text(v1_content, encoding="utf-8")
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        entries = store.load()
+
+        assert entries[0].transcript_status == TranscriptStatus.DONE
+        assert entries[0].has_transcript is True
+
+    def test_parse_v1_emoji_pending(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        v1_content = (
+            "# Recordings Registry\n\n"
+            "| File | Playlist | Uploaded | Transcript | primary |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| vid.mp4 | folder | 2025-01-20 | ❌ | abc123 |\n"
+        )
+        registry_path.write_text(v1_content, encoding="utf-8")
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        entries = store.load()
+
+        assert entries[0].transcript_status == TranscriptStatus.PENDING
+        assert entries[0].has_transcript is False
+
+    def test_parse_v2_string_formats(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        v2_content = (
+            "# Recordings Registry\n\n"
+            "<!-- registry_version: 2 -->\n\n"
+            "| File | Playlist | Uploaded | Transcript | primary |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| a.mp4 | f | 2025-01-20 | pending | id1 |\n"
+            "| b.mp4 | f | 2025-01-20 | done | id2 |\n"
+            "| c.mp4 | f | 2025-01-20 | unavailable | id3 |\n"
+            "| d.mp4 | f | 2025-01-20 | error | id4 |\n"
+        )
+        registry_path.write_text(v2_content, encoding="utf-8")
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        entries = store.load()
+
+        assert entries[0].transcript_status == TranscriptStatus.PENDING
+        assert entries[1].transcript_status == TranscriptStatus.DONE
+        assert entries[2].transcript_status == TranscriptStatus.UNAVAILABLE
+        assert entries[3].transcript_status == TranscriptStatus.ERROR
+
+    def test_parse_unknown_raises(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        bad_content = (
+            "# Recordings Registry\n\n"
+            "| File | Playlist | Uploaded | Transcript | primary |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| vid.mp4 | folder | 2025-01-20 | invalid_status | abc123 |\n"
+        )
+        registry_path.write_text(bad_content, encoding="utf-8")
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        with pytest.raises(RegistryParseError, match="Unknown transcript status"):
+            store.load()
+
+    def test_auto_upgrade_on_write(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        v1_content = (
+            "# Recordings Registry\n\n"
+            "| File | Playlist | Uploaded | Transcript | primary |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| vid.mp4 | folder | 2025-01-20 | ✅ | abc123 |\n"
+        )
+        registry_path.write_text(v1_content, encoding="utf-8")
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        entries = store.load()
+        store._write_all(entries)
+
+        content = registry_path.read_text(encoding="utf-8")
+        assert "<!-- registry_version: 2 -->" in content
+        assert "✅" not in content
+        assert "| done |" in content
+
+    def test_round_trip_v2(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        for status in TranscriptStatus:
+            entry = RegistryEntry(
+                file=f"{status.value}.mp4",
+                playlist="test",
+                uploaded_date=date(2025, 1, 20),
+                transcript_status=status,
+                account_ids={"primary": "id1"},
+            )
+            store.append(entry)
+
+        entries = store.load()
+
+        assert len(entries) == len(TranscriptStatus)
+        for entry, expected in zip(entries, TranscriptStatus):
+            assert entry.transcript_status == expected
+
+    def test_update_transcript_with_enum(self, temp_registry_dir: Path) -> None:
+        registry_path = temp_registry_dir / "registry.md"
+        store = MarkdownRegistryStore(registry_path, ["primary"])
+
+        entry = RegistryEntry(
+            file="vid.mp4",
+            playlist="folder",
+            uploaded_date=date(2025, 1, 20),
+            transcript_status=TranscriptStatus.PENDING,
+            account_ids={"primary": "abc123"},
+        )
+        store.append(entry)
+
+        store.update_transcript("vid.mp4", TranscriptStatus.DONE)
+        entries = store.load()
+        assert entries[0].transcript_status == TranscriptStatus.DONE
+
+        store.update_transcript("vid.mp4", TranscriptStatus.UNAVAILABLE)
+        entries = store.load()
+        assert entries[0].transcript_status == TranscriptStatus.UNAVAILABLE
