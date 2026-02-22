@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 
 import pytest
 
 from yt_recorder.config import Config
+from yt_recorder.domain.exceptions import (
+    RegistryFileNotFoundError,
+    TranscriptNotReadyError,
+    TranscriptUnavailableError,
+)
 from yt_recorder.domain.models import RegistryEntry, TranscriptStatus, UploadResult, YouTubeAccount
 from yt_recorder.pipeline import RecordingPipeline
 
