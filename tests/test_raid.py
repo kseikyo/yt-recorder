@@ -79,7 +79,7 @@ class TestRaidAdapter:
             accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
         )
         raid.open()
-        results, playlist_failures = raid.upload(
+        results, _playlist_failures = raid.upload(
             Path("/tmp/test.mp4"), "Test Title", "test-playlist"
         )
         raid.close()
