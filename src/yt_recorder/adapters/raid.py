@@ -89,14 +89,18 @@ class RaidAdapter:
         primary_adapter = self._adapters[self.primary.name]
         primary_result = primary_adapter.upload(path, title)
         results[self.primary.name] = primary_result
-        primary_adapter.assign_playlist(primary_result.video_id, playlist)
+        playlist_ok = primary_adapter.assign_playlist(primary_result.video_id, playlist)
+        if not playlist_ok:
+            logger.warning("Playlist assignment failed for %s on %s", playlist, self.primary.name)
 
         for mirror in self.mirrors:
             try:
                 mirror_adapter = self._adapters[mirror.name]
                 mirror_result = mirror_adapter.upload(path, title)
                 results[mirror.name] = mirror_result
-                mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
+                playlist_ok = mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
+                if not playlist_ok:
+                    logger.warning("Playlist assignment failed for %s on %s", playlist, mirror.name)
             except Exception as e:
                 logger.warning("Mirror %s failed: %s", mirror.name, e)
                 results[mirror.name] = None

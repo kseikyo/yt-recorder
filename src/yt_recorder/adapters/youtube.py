@@ -172,7 +172,7 @@ class YouTubeBrowserAdapter:
         finally:
             page.close()
 
-    def assign_playlist(self, video_id: str, playlist_name: str) -> None:
+    def assign_playlist(self, video_id: str, playlist_name: str) -> bool:
         if not self.context:
             raise RuntimeError("Browser not opened. Call open() first.")
 
@@ -188,7 +188,7 @@ class YouTubeBrowserAdapter:
             playlist_dropdown = page.query_selector(constants.PLAYLIST_DROPDOWN)
             if not playlist_dropdown:
                 logger.warning("Playlist dropdown not found for video %s", video_id)
-                return
+                return False
 
             playlist_dropdown.click()
             self._random_delay("field")
@@ -198,7 +198,7 @@ class YouTubeBrowserAdapter:
             )
             if not playlist_option:
                 logger.warning("Playlist '%s' not found for video %s", playlist_name, video_id)
-                return
+                return False
 
             playlist_option.click()
             self._random_delay("field")
@@ -206,9 +206,10 @@ class YouTubeBrowserAdapter:
             save_btn = page.query_selector(constants.PLAYLIST_SAVE)
             if not save_btn:
                 logger.warning("Save button not found for video %s", video_id)
-                return
+                return False
 
             save_btn.click()
             self._random_delay("post")
+            return True
         finally:
             page.close()

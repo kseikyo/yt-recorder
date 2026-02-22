@@ -135,6 +135,7 @@ class SyncReport:
     delete_failed: int = 0
     transcripts_fetched: int = 0
     transcripts_pending: int = 0
+    playlist_failed: int = 0
     total_registered: int = 0
     account_stats: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
