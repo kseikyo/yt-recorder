@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest an enhancement or new feature
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Focus on the problem and use case, not the solution.
+  
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: What problem are you trying to solve? What workflow would this enable?
+      placeholder: |
+        I want to organize uploaded videos by date, not just by folder.
+        This would help me find recordings from specific time periods quickly.
+    validations:
+      required: true
+  
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Workaround
+      description: How do you solve this problem today (if at all)?
+  
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other solutions have you thought about?
+  
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, examples, related issues, etc.

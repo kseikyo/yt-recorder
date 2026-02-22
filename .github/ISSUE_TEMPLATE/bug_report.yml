@@ -1,0 +1,69 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below.
+  
+  - type: input
+    id: version
+    attributes:
+      label: yt-recorder version
+      description: Run `yt-recorder --version` or check `pyproject.toml`
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide exact commands that trigger the bug
+      placeholder: |
+        1. Run `yt-recorder upload ~/recordings`
+        2. Observe error message
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include error messages or logs
+    validations:
+      required: true
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: Paste relevant logs with --verbose flag. REDACT credentials!
+      render: shell
+  
+  - type: textarea
+    id: config
+    attributes:
+      label: Config (optional)
+      description: Paste relevant config.toml sections. REDACT account paths!
+      render: toml
