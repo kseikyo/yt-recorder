@@ -1,4 +1,4 @@
-# yt-recorder
+# yt-recorder (v0.2.0)
 
 YouTube as organized private video storage. Upload recordings via Playwright browser automation, RAID-mirror across multiple accounts, extract transcripts.
 
@@ -100,14 +100,26 @@ Every video is uploaded to multiple accounts for redundancy:
 ### Video Lifecycle
 
 ```
-DISCOVERED → upload (×N accounts) → REGISTERED → delete local → transcript → TRANSCRIBED
+DISCOVERED → upload --keep → REGISTERED → status → transcribe → clean → TRANSCRIBED
 ```
 
-1. File found in directory
-2. Uploaded to all configured accounts (primary + mirrors)
-3. Registered in `registry.md`
-4. Local file deleted (if all uploads succeeded)
-5. Transcript extracted (may take minutes to hours)
+1. **DISCOVERED**: File found in directory
+2. **upload --keep**: Uploaded to all configured accounts (primary + mirrors) without deleting local files
+3. **REGISTERED**: Entry created in `registry.md`
+4. **status**: Verify upload success and transcript availability
+5. **transcribe**: Fetch transcripts for uploaded videos
+6. **clean**: Delete local files only after they are marked as `TRANSCRIBED` in the registry
+
+### Transcript Status
+
+The `transcribe` command tracks the state of each video's transcript:
+
+- **PENDING**: Transcript not yet available (YouTube is still processing)
+- **DONE**: Transcript successfully fetched and saved locally
+- **UNAVAILABLE**: YouTube has no auto-captions for this video
+- **ERROR**: Fetch failed (network issue, authentication error, etc.)
+
+**Retry Behavior**: Running `transcribe --retry` will only attempt to fetch transcripts for videos currently in the **ERROR** state. PENDING and UNAVAILABLE states are skipped unless `--force` is used.
 
 ## Commands
 
@@ -160,9 +172,34 @@ Show upload and transcript status.
 yt-recorder status DIRECTORY
 ```
 
+### `clean`
+
+Delete local files that have been successfully uploaded and transcribed.
+
+```bash
+yt-recorder clean DIRECTORY [OPTIONS]
+```
+
+Options:
+- `--dry-run`: Show which files would be deleted without actually deleting them
+
+**Safety**: This command only deletes files that are explicitly marked as `status=TRANSCRIBED` in the registry.
+
+### `health`
+
+Verify that account credentials and authentication states are still valid.
+
+```bash
+yt-recorder health
+```
+
+**Output**: Shows which configured accounts are currently authenticated and ready for use.
+
 ## Security
 
 ⚠️ **Credential files grant full Google account access.**
+
+See [SECURITY.md](SECURITY.md) for detailed security practices and vulnerability reporting.
 
 After running `setup`, these files are created:
 - `storage_state.json`: Playwright session (cookies, localStorage)
@@ -189,9 +226,35 @@ After running `setup`, these files are created:
 
 ### Architecture
 
-- **Hexagonal architecture**: CLI → Pipeline → Adapters → Domain
-- **Sync Playwright**: No async/await complexity
-- **Protocol-based**: Easy to test, extend to other platforms
+yt-recorder follows a **Hexagonal Architecture** (Ports and Adapters) to ensure core logic remains isolated from external dependencies like YouTube's UI or the local filesystem.
+
+```
+      ┌─────────────────────────────────────────────────────────┐
+      │                          CLI                            │
+      │           (upload, transcribe, sync, status)            │
+      └───────────────┬───────────────────────────┬─────────────┘
+                      │                           │
+      ┌───────────────▼───────────────────────────▼─────────────┐
+      │                        Pipeline                         │
+      │         (Orchestrates Upload → Registry → Clean)        │
+      └───────────────┬───────────────────────────┬─────────────┘
+                      │                           │
+      ┌───────────────▼───────────────────────────▼─────────────┐
+      │                        Adapters                         │
+      │        (YouTubeAdapter, RAID, RegistryAdapter)          │
+      └───────────────┬───────────────────────────┬─────────────┘
+                      │                           │
+      ┌───────────────▼───────────────────────────▼─────────────┐
+      │                         Domain                          │
+      │        (Models, Protocols: VideoUploader, etc.)         │
+      └─────────────────────────────────────────────────────────┘
+```
+
+- **CLI**: Entry points using `click`.
+- **Pipeline**: High-level orchestration of the video lifecycle.
+- **Adapters**: Concrete implementations of domain protocols. `RAID` coordinates multiple `YouTubeAdapter` instances.
+- **Domain**: Pure business logic, models (`RegistryEntry`, `TranscriptStatus`), and protocol definitions.
+- **Sync Playwright**: Uses synchronous Playwright for predictable browser automation without `async/await` complexity.
 
 ### Tools Used
 
@@ -222,10 +285,14 @@ YouTube auto-captions take minutes to hours to process. Re-run `transcribe` late
 
 ## Contributing
 
-PRs welcome. Please ensure:
-- `mypy --strict` passes
-- `ruff check` passes
-- Tests pass with `pytest --cov`
+**Issues welcome · PRs paused**
+
+We are currently accepting bug reports and feature requests via GitHub Issues. However, as a solo-maintained project in active v0.2 development, **Pull Requests are currently paused** and will not be reviewed at this time. This allows us to focus on stabilizing the core architecture.
+
+If you'd like to contribute:
+1. Check existing issues or open a new one
+2. Ensure `mypy --strict` and `ruff check` pass on your local changes
+3. Run tests with `pytest --cov`
 
 ## License
 
