@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import fcntl
 import os
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from yt_recorder.domain.exceptions import (
     RegistryFileNotFoundError,
@@ -78,6 +82,19 @@ class MarkdownRegistryStore:
 
         return entries
 
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
+        """Advisory file lock for concurrent access safety."""
+        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.registry_path.with_suffix(".lock")
+        fd = open(lock_path, "w")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            fd.close()
+
     def append(self, entry: RegistryEntry) -> None:
         """Append a new entry to registry.
 
@@ -91,14 +108,15 @@ class MarkdownRegistryStore:
             RegistryWriteError: If write fails
         """
         try:
-            if not self.registry_path.exists():
-                self._create_registry()
+            with self._locked():
+                if not self.registry_path.exists():
+                    self._create_registry()
 
-            content = self.registry_path.read_text(encoding="utf-8")
-            new_row = self._format_row(entry)
-            new_content = content.rstrip() + "\n" + new_row + "\n"
+                content = self.registry_path.read_text(encoding="utf-8")
+                new_row = self._format_row(entry)
+                new_content = content.rstrip() + "\n" + new_row + "\n"
 
-            self._atomic_write(new_content)
+                self._atomic_write(new_content)
         except (OSError, UnicodeDecodeError) as e:
             raise RegistryWriteError(f"Failed to append entry: {e}") from e
 
@@ -113,25 +131,26 @@ class MarkdownRegistryStore:
             RegistryWriteError: If update fails
         """
         try:
-            entries = self.load()
-            updated = False
+            with self._locked():
+                entries = self.load()
+                updated = False
 
-            for i, entry in enumerate(entries):
-                if entry.file == file:
-                    entries[i] = RegistryEntry(
-                        file=entry.file,
-                        playlist=entry.playlist,
-                        uploaded_date=entry.uploaded_date,
-                        has_transcript=status,
-                        account_ids=entry.account_ids,
-                    )
-                    updated = True
-                    break
+                for i, entry in enumerate(entries):
+                    if entry.file == file:
+                        entries[i] = RegistryEntry(
+                            file=entry.file,
+                            playlist=entry.playlist,
+                            uploaded_date=entry.uploaded_date,
+                            has_transcript=status,
+                            account_ids=entry.account_ids,
+                        )
+                        updated = True
+                        break
 
-            if not updated:
-                raise RegistryWriteError(f"File not found in registry: {file}")
+                if not updated:
+                    raise RegistryWriteError(f"File not found in registry: {file}")
 
-            self._write_all(entries)
+                self._write_all(entries)
         except RegistryWriteError:
             raise
         except Exception as e:
@@ -148,21 +167,38 @@ class MarkdownRegistryStore:
         Raises:
             RegistryWriteError: If update fails or file not found
         """
-        entries = self.load()
-        for i, entry in enumerate(entries):
-            if entry.file == file:
-                new_ids = dict(entry.account_ids)
-                new_ids[account] = video_id
-                entries[i] = RegistryEntry(
-                    file=entry.file,
-                    playlist=entry.playlist,
-                    uploaded_date=entry.uploaded_date,
-                    has_transcript=entry.has_transcript,
-                    account_ids=new_ids,
-                )
-                self._write_all(entries)
-                return
-        raise RegistryWriteError(f"File not found in registry: {file}")
+        with self._locked():
+            entries = self.load()
+            for i, entry in enumerate(entries):
+                if entry.file == file:
+                    new_ids = dict(entry.account_ids)
+                    new_ids[account] = video_id
+                    entries[i] = RegistryEntry(
+                        file=entry.file,
+                        playlist=entry.playlist,
+                        uploaded_date=entry.uploaded_date,
+                        has_transcript=entry.has_transcript,
+                        account_ids=new_ids,
+                    )
+                    self._write_all(entries)
+                    return
+            raise RegistryWriteError(f"File not found in registry: {file}")
+
+    def update_many(self, updates: dict[str, dict[str, Any]]) -> None:
+        """Batch update multiple entries. Single load, mutate, single write."""
+        with self._locked():
+            entries = self.load()
+            for i, entry in enumerate(entries):
+                if entry.file in updates:
+                    fields = updates[entry.file]
+                    entries[i] = RegistryEntry(
+                        file=entry.file,
+                        playlist=entry.playlist,
+                        uploaded_date=entry.uploaded_date,
+                        has_transcript=fields.get("has_transcript", entry.has_transcript),
+                        account_ids=fields.get("account_ids", entry.account_ids),
+                    )
+            self._write_all(entries)
 
     def is_registered(self, relative_path: str) -> bool:
         """Check if file is registered.
