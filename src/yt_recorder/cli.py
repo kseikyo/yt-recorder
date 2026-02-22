@@ -219,6 +219,35 @@ def status(directory: Path) -> None:
     )
 
 
+@main.command()
+@click.argument(
+    "directory", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path)
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted")
+def clean(directory: Path, dry_run: bool) -> None:
+    """Delete local files that are fully synced."""
+    from yt_recorder.pipeline import RecordingPipeline
+
+    pipeline = RecordingPipeline.from_directory(directory)
+    report = pipeline.clean_synced(directory, dry_run=dry_run)
+
+    if dry_run:
+        if report.eligible:
+            click.echo(f"Would delete {len(report.eligible)} files:")
+            for f in report.eligible:
+                click.echo(f"  {f}")
+        else:
+            click.echo("No files eligible for cleanup")
+        return
+
+    click.echo(f"Deleted: {report.deleted}")
+    click.echo(f"Skipped: {report.skipped}")
+    if report.errors:
+        click.echo(f"\nErrors ({len(report.errors)}):")
+        for e in report.errors:
+            click.echo(f"  - {e}")
+
+
 def _find_free_port() -> int:
     """Find free TCP port for Chrome DevTools Protocol.
 

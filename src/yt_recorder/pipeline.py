@@ -8,7 +8,13 @@ from typing import Callable, Optional
 
 from yt_recorder.config import Config, load_config
 from yt_recorder.domain.formatters import title_from_filename, format_transcript_md, parse_srt
-from yt_recorder.domain.models import RegistryEntry, SyncReport, TranscriptStatus, UploadResult
+from yt_recorder.domain.models import (
+    RegistryEntry,
+    SyncReport,
+    TranscriptStatus,
+    UploadResult,
+    CleanReport,
+)
 from yt_recorder.domain.exceptions import (
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
@@ -19,6 +25,7 @@ from yt_recorder.adapters.scanner import scan_recordings
 from yt_recorder.adapters.raid import RaidAdapter
 from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
 from yt_recorder.domain.protocols import RegistryStore, TranscriptFetcher
+from yt_recorder.utils import safe_resolve
 
 logger = logging.getLogger(__name__)
 
@@ -301,4 +308,51 @@ class RecordingPipeline:
             transcripts_fetched=fetched,
             transcripts_pending=pending,
             errors=errors,
+        )
+
+    def clean_synced(self, directory: Path, dry_run: bool = False) -> CleanReport:
+        """Delete local files fully synced (all accounts + terminal transcript status)."""
+        try:
+            entries = self.registry.load()
+        except RegistryFileNotFoundError:
+            return CleanReport()
+
+        terminal = {TranscriptStatus.DONE, TranscriptStatus.UNAVAILABLE}
+        account_names = [a.name for a in self.config.accounts]
+        deleted = 0
+        skipped = 0
+        errors: list[str] = []
+        eligible: list[str] = []
+
+        for entry in entries:
+            path = safe_resolve(directory, entry.file)
+            if not path.exists():
+                continue
+
+            # Check all accounts uploaded
+            all_uploaded = all(entry.account_ids.get(name, "—") != "—" for name in account_names)
+            if not all_uploaded:
+                skipped += 1
+                continue
+
+            # Check transcript terminal
+            if entry.transcript_status not in terminal:
+                skipped += 1
+                continue
+
+            if dry_run:
+                eligible.append(entry.file)
+                continue
+
+            try:
+                path.unlink()
+                deleted += 1
+            except OSError as e:
+                errors.append(f"Failed to delete {entry.file}: {e}")
+
+        return CleanReport(
+            deleted=deleted,
+            skipped=skipped,
+            errors=errors,
+            eligible=eligible,
         )

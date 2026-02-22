@@ -114,6 +114,16 @@ class FileUploadResult:
 
 
 @dataclass(frozen=True)
+class CleanReport:
+    """Report from clean_synced() operation."""
+
+    deleted: int = 0
+    skipped: int = 0
+    errors: list[str] = field(default_factory=list)
+    eligible: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class SyncReport:
     """Report of upload/transcript sync operation."""
 
