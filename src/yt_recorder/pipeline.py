@@ -77,6 +77,7 @@ class RecordingPipeline:
         deleted_count = 0
         kept_count = 0
         delete_failed = 0
+        playlist_failed = 0
         errors = []
 
         files = scan_recordings(
@@ -123,9 +124,12 @@ class RecordingPipeline:
                         adapter = self.raid.get_adapter(single_account)
                         result = adapter.upload(path, title)
                         results: dict[str, UploadResult | None] = {single_account: result}
-                        adapter.assign_playlist(result.video_id, playlist)
+                        pl_ok = adapter.assign_playlist(result.video_id, playlist)
+                        if not pl_ok:
+                            playlist_failed += 1
                     else:
-                        results = self.raid.upload(path, title, playlist)
+                        results, pf = self.raid.upload(path, title, playlist)
+                        playlist_failed += pf
 
                     all_succeeded = all(r is not None for r in results.values())
 
@@ -163,7 +167,7 @@ class RecordingPipeline:
                     ]
                     if not failed_accounts:
                         continue
-                    file_path = directory / entry.file
+                    file_path = safe_resolve(directory, entry.file)
                     if not file_path.exists():
                         errors.append(
                             f"Cannot retry {entry.file}: file not found (already deleted)"
@@ -201,6 +205,7 @@ class RecordingPipeline:
             deleted_count=deleted_count,
             kept_count=kept_count,
             delete_failed=delete_failed,
+            playlist_failed=playlist_failed,
             total_registered=len(entries) + uploaded,
             errors=errors,
         )
@@ -265,7 +270,9 @@ class RecordingPipeline:
                 video_id = entry.account_ids[primary_name]
 
                 # Save to transcripts/{subdir}/{name}.md
-                transcript_path = directory / "transcripts" / Path(entry.file).with_suffix(".md")
+                safe_entry = safe_resolve(directory, entry.file)
+                rel_entry = safe_entry.relative_to(directory.resolve())
+                transcript_path = directory / "transcripts" / rel_entry.with_suffix(".md")
                 transcript_path.parent.mkdir(parents=True, exist_ok=True)
 
                 if transcript_path.exists() and not force:
