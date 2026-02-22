@@ -4,26 +4,26 @@ import logging
 from datetime import date
 from pathlib import Path
 from time import sleep
-from typing import Callable, Optional
+from typing import Callable
 
+from yt_recorder.adapters.raid import RaidAdapter
+from yt_recorder.adapters.registry import MarkdownRegistryStore
+from yt_recorder.adapters.scanner import scan_recordings
+from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
 from yt_recorder.config import Config, load_config
-from yt_recorder.domain.formatters import title_from_filename, format_transcript_md, parse_srt
-from yt_recorder.domain.models import (
-    RegistryEntry,
-    SyncReport,
-    TranscriptStatus,
-    UploadResult,
-    CleanReport,
-)
 from yt_recorder.domain.exceptions import (
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
     TranscriptUnavailableError,
 )
-from yt_recorder.adapters.registry import MarkdownRegistryStore
-from yt_recorder.adapters.scanner import scan_recordings
-from yt_recorder.adapters.raid import RaidAdapter
-from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
+from yt_recorder.domain.formatters import format_transcript_md, parse_srt, title_from_filename
+from yt_recorder.domain.models import (
+    CleanReport,
+    RegistryEntry,
+    SyncReport,
+    TranscriptStatus,
+    UploadResult,
+)
 from yt_recorder.domain.protocols import RegistryStore, TranscriptFetcher
 from yt_recorder.utils import safe_resolve
 
@@ -122,7 +122,7 @@ class RecordingPipeline:
                     if single_account:
                         adapter = self.raid.get_adapter(single_account)
                         result = adapter.upload(path, title)
-                        results: dict[str, Optional[UploadResult]] = {single_account: result}
+                        results: dict[str, UploadResult | None] = {single_account: result}
                         adapter.assign_playlist(result.video_id, playlist)
                     else:
                         results = self.raid.upload(path, title, playlist)

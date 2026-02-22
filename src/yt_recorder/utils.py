@@ -39,7 +39,7 @@ def safe_resolve(base: Path, untrusted: str) -> Path:
     except ValueError:
         raise ValueError(
             f"Path traversal rejected: {untrusted} escapes base directory {base_resolved}"
-        )
+        ) from None
 
     return resolved
 

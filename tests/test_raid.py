@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from yt_recorder.adapters.raid import RaidAdapter
-from yt_recorder.domain.models import YouTubeAccount, UploadResult
+from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
 
 class TestRaidAdapter:

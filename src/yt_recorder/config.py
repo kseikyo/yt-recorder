@@ -117,8 +117,8 @@ def save_config_template(config_path: Path | None = None) -> None:
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    template = """# yt-recorder configuration
-# Place this file at: {path}
+    template = f"""# yt-recorder configuration
+# Place this file at: {config_path}
 
 [accounts]
 # Add your YouTube accounts here
@@ -139,6 +139,6 @@ headless = true
 [transcript]
 language = "en"
 delay = 1.0
-""".format(path=config_path)
+"""
 
     config_path.write_text(template)

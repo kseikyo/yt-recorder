@@ -85,3 +85,49 @@ Atomic write pattern (tempfile + os.replace) doesn't preserve permissions. Must 
 - 132/134 tests pass (2 pre-existing failures from os.chmod in close()) ✓
 
 **Key Insight**: Lazy formatting defers string interpolation to logging handler, preventing injection attacks. The logging module safely escapes variables at output time.
+
+## Registry Batch Update + File Locking (W1.3) - COMPLETED
+
+### Implementation
+- `_locked()` context manager: fcntl.flock(LOCK_EX) on .lock file adjacent to registry.md
+- `update_many(updates)`: single load → iterate + mutate → single _write_all()
+- All mutators (append, update_transcript, update_account_id) wrapped with `_locked()`
+
+### Typing Decision
+- Plan specified `dict[str, dict[str, object]]` for update_many signature
+- Used `dict[str, dict[str, Any]]` instead — `object` causes mypy --strict failures with RegistryEntry constructor (can't assign `object` to `bool`/`dict[str,str]` params)
+- `Any` is correct here: values are dynamically typed field overrides
+
+### Ruff Compliance
+- `collections.abc.Iterator` preferred over `typing.Iterator` (UP035)
+- Import block must be alphabetically sorted (I001)
+- `SIM115` rule not enabled in project ruff config — no `noqa` needed for bare `open()`
+
+### Performance Impact
+- Before: 50 transcripts → 100 I/O ops (50 load + 50 write)
+- After: 50 transcripts → 2 I/O ops (1 load + 1 write via update_many)
+- Existing tests (18) pass unchanged — locking is transparent to existing callers
+
+## TranscriptStatus Enum (W3.1) - COMPLETED
+
+### Implementation
+- Added `class TranscriptStatus(str, Enum)` with 4 states: PENDING, DONE, UNAVAILABLE, ERROR
+- Changed `RegistryEntry.has_transcript: bool` → `transcript_status: TranscriptStatus`
+- Added `@property has_transcript() -> bool` for backwards compatibility
+- Returns `self.transcript_status == TranscriptStatus.DONE`
+
+### Design Rationale
+- `str, Enum` inheritance allows string serialization + `isinstance(TranscriptStatus.DONE, str)` = True
+- Satisfies Protocol's `status: str` requirement
+- Enables round-trip to/from registry markdown format
+- UNAVAILABLE state fixes infinite retry bug (distinguishes from ERROR)
+
+### Type Safety
+- mypy --strict: 5 expected errors in registry.py + pipeline.py (W3.2 fixes these)
+- models.py itself: fully typed, no errors
+- Enum values: "pending", "done", "unavailable", "error"
+
+### Backwards Compatibility
+- `entry.has_transcript` property allows existing code to work during migration
+- W3.2 will update registry format to use enum values
+- W3.3 will update pipeline to use enum directly

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import click
 import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+
+import click
 
 from yt_recorder.utils import find_chrome
 
@@ -38,8 +38,8 @@ def main(verbose: bool) -> None:
 def upload(
     directory: Path,
     dry_run: bool,
-    limit: Optional[int],
-    account: Optional[str],
+    limit: int | None,
+    account: str | None,
     keep: bool,
     retry_failed: bool,
 ) -> None:
@@ -105,9 +105,7 @@ def transcribe(directory: Path, retry: bool, force: bool) -> None:
 @click.option("--limit", "-n", type=int, help="Max files to upload")
 @click.option("--keep", is_flag=True, help="Keep local files after upload")
 @click.option("--retry-failed", is_flag=True, help="Retry failed mirror uploads")
-def sync(
-    directory: Path, dry_run: bool, limit: Optional[int], keep: bool, retry_failed: bool
-) -> None:
+def sync(directory: Path, dry_run: bool, limit: int | None, keep: bool, retry_failed: bool) -> None:
     """Sync recordings (upload + transcribe).
 
     Uploads new videos then fetches transcripts. Transcripts may not be
@@ -159,9 +157,9 @@ def _transcript_icon(status_value: str) -> str:
 )
 def status(directory: Path) -> None:
     """Show upload and transcript status."""
-    from yt_recorder.config import load_config
     from yt_recorder.adapters.registry import MarkdownRegistryStore
     from yt_recorder.adapters.scanner import scan_recordings
+    from yt_recorder.config import load_config
     from yt_recorder.domain.exceptions import RegistryFileNotFoundError, RegistryParseError
 
     config = load_config()
@@ -188,7 +186,7 @@ def status(directory: Path) -> None:
     transcribed = 0
     mirror_failures = 0
 
-    for path, playlist in files:
+    for path, _playlist in files:
         rel_path = str(path.relative_to(directory))
         entry = entry_map.get(rel_path)
 
@@ -199,7 +197,7 @@ def status(directory: Path) -> None:
             if entry.has_transcript:
                 transcribed += 1
 
-            for account, video_id in entry.account_ids.items():
+            for _account, video_id in entry.account_ids.items():
                 if video_id == "—":
                     mirror_failures += 1
         else:
@@ -213,7 +211,7 @@ def status(directory: Path) -> None:
             click.echo(f"  ☁️  {entry.file} [{entry.transcript_status.value}] {icon}")
             if entry.has_transcript:
                 transcribed += 1
-            for acct_name, video_id in entry.account_ids.items():
+            for _acct_name, video_id in entry.account_ids.items():
                 if video_id == "—":
                     mirror_failures += 1
 
@@ -295,7 +293,7 @@ def health() -> None:
     """
     from yt_recorder.config import load_config
 
-    config_dir = Path.home() / ".config" / "yt-recorder"
+    Path.home() / ".config" / "yt-recorder"
     checks_passed = 0
     checks_failed = 0
 
@@ -528,7 +526,7 @@ def setup(account: str) -> None:
     new_lines = []
     for line in config_lines:
         stripped = line.strip()
-        if stripped.startswith(f"{account} ") or stripped.startswith(f"{account}="):
+        if stripped.startswith((f"{account} ", f"{account}=")):
             new_lines.append(f'{account} = "{storage_state_path}"')
             account_exists = True
         else:
@@ -571,12 +569,12 @@ def setup(account: str) -> None:
     click.echo(f"\n✅ Account '{account}' configured successfully!")
     click.echo(f"   Storage state: {storage_state_path}")
     click.echo(f"   Cookies: {cookies_path}")
-    click.echo(f"\n⚠️  WARNING: These files grant full Google account access.")
-    click.echo(f"   NEVER commit or share them!")
+    click.echo("\n⚠️  WARNING: These files grant full Google account access.")
+    click.echo("   NEVER commit or share them!")
     click.echo(f"   They are in: {config_dir}")
-    click.echo(f"\nNext steps:")
+    click.echo("\nNext steps:")
     click.echo(f"   1. Edit {config_path} to adjust settings if needed")
-    click.echo(f"   2. Run: yt-recorder upload <directory>")
+    click.echo("   2. Run: yt-recorder upload <directory>")
 
 
 if __name__ == "__main__":
