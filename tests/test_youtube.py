@@ -133,7 +133,8 @@ class TestClose:
         adapter.browser = mock_browser
         adapter._playwright = mock_playwright
 
-        adapter.close()
+        with patch("os.chmod"):
+            adapter.close()
 
         mock_context.storage_state.assert_called_once()
         mock_context.close.assert_called_once()
@@ -153,7 +154,8 @@ class TestClose:
         adapter.context = Mock()
         adapter.browser = Mock()
         adapter._playwright = None
-        adapter.close()
+        with patch("os.chmod"):
+            adapter.close()
         adapter.context.storage_state.assert_called_once()
         adapter.context.close.assert_called_once()
         adapter.browser.close.assert_called_once()
@@ -242,8 +244,6 @@ class TestUpload:
             elif selector == "#done-button":
                 return mock_done_btn
             elif selector == "iframe[src*='recaptcha'], div#captcha-container":
-                return None
-            elif selector == "ytcp-video-upload-progress":
                 return None
             return None
 

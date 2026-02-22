@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import platform
 import random
 import shutil
@@ -95,6 +96,7 @@ class YouTubeBrowserAdapter:
     def close(self) -> None:
         if self.context:
             self.context.storage_state(path=str(self.account.storage_state))
+            os.chmod(str(self.account.storage_state), 0o600)
             self.context.close()
         if self.browser:
             self.browser.close()
@@ -107,7 +109,7 @@ class YouTubeBrowserAdapter:
 
         page = self.context.new_page()
         try:
-            page.goto(constants.UPLOAD_URL, wait_until="networkidle")
+            page.goto(constants.UPLOAD_URL, wait_until="domcontentloaded")
             self._check_session_expired(page)
             self._check_bot_detection(page)
 
@@ -164,6 +166,21 @@ class YouTubeBrowserAdapter:
 
             video_id = video_url.split("/")[-1].split("?")[0]
 
+            # Wait for file upload to finish (Done button becomes enabled)
+            try:
+                page.wait_for_function(
+                    """() => {
+                        const done = document.querySelector('#done-button');
+                        if (!done) return false;
+                        return done.getAttribute('aria-disabled') !== 'true';
+                    }""",
+                    timeout=constants.UPLOAD_TIMEOUT_SECONDS * 1000,
+                )
+            except TimeoutError as e:
+                raise UploadTimeoutError(
+                    f"Upload exceeded {constants.UPLOAD_TIMEOUT_SECONDS}s timeout"
+                ) from e
+
             done_btn = page.query_selector(constants.DONE_BUTTON)
             if not done_btn:
                 raise SelectorChangedError("Done button selector not found")
@@ -171,17 +188,11 @@ class YouTubeBrowserAdapter:
 
             self._random_delay("post")
 
-            start_time = time.time()
-            while time.time() - start_time < constants.UPLOAD_TIMEOUT_SECONDS:
-                progress = page.query_selector(constants.UPLOAD_PROGRESS)
-                if not progress:
-                    break
-                time.sleep(1)
-
-            if time.time() - start_time >= constants.UPLOAD_TIMEOUT_SECONDS:
-                raise UploadTimeoutError(
-                    f"Upload exceeded {constants.UPLOAD_TIMEOUT_SECONDS}s timeout"
-                )
+            # Wait for upload dialog to close after publishing
+            try:
+                page.wait_for_selector("ytcp-uploads-dialog", state="hidden", timeout=60000)
+            except TimeoutError:
+                logger.warning("Upload dialog did not close, but video was published")
 
             return UploadResult(
                 video_id=video_id,
@@ -199,7 +210,7 @@ class YouTubeBrowserAdapter:
         page = self.context.new_page()
         try:
             edit_url = constants.STUDIO_EDIT_URL.format(video_id=video_id)
-            page.goto(edit_url, wait_until="networkidle")
+            page.goto(edit_url, wait_until="domcontentloaded")
             self._check_session_expired(page)
             self._check_bot_detection(page)
 
@@ -207,27 +218,25 @@ class YouTubeBrowserAdapter:
 
             playlist_dropdown = page.query_selector("tp-yt-paper-button[aria-label*='Playlist']")
             if not playlist_dropdown:
-                logger.warning(f"Playlist dropdown not found for video {video_id}")
+                logger.warning("Playlist dropdown not found for video %s", video_id)
                 return
-            
+
             playlist_dropdown.click()
             self._random_delay("field")
 
-            playlist_option = page.query_selector(
-                f"tp-yt-paper-item:has-text('{playlist_name}')"
-            )
+            playlist_option = page.query_selector(f"tp-yt-paper-item:has-text('{playlist_name}')")
             if not playlist_option:
-                logger.warning(f"Playlist '{playlist_name}' not found for video {video_id}")
+                logger.warning("Playlist '%s' not found for video %s", playlist_name, video_id)
                 return
-            
+
             playlist_option.click()
             self._random_delay("field")
 
             save_btn = page.query_selector("tp-yt-button-shape[aria-label='Save']")
             if not save_btn:
-                logger.warning(f"Save button not found for video {video_id}")
+                logger.warning("Save button not found for video %s", video_id)
                 return
-            
+
             save_btn.click()
             self._random_delay("post")
         finally:

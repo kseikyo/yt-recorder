@@ -28,7 +28,9 @@ class RaidAdapter:
             raise ValueError("No accounts configured. Run: yt-recorder setup --account <name>")
         primary = [a for a in accounts if a.role == "primary"]
         if not primary:
-            raise ValueError("No primary account found. The first configured account is used as primary.")
+            raise ValueError(
+                "No primary account found. The first configured account is used as primary."
+            )
         self.primary = primary[0]
         self.mirrors = [a for a in accounts if a.role == "mirror"]
         self.headless = headless
@@ -96,7 +98,7 @@ class RaidAdapter:
                 results[mirror.name] = mirror_result
                 mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
             except Exception as e:
-                logger.warning(f"Mirror {mirror.name} failed: {e}")
+                logger.warning("Mirror %s failed: %s", mirror.name, e)
                 results[mirror.name] = None
 
         return results

@@ -38,9 +38,7 @@ class RecordingPipeline:
         self.transcriber = transcriber
 
     @classmethod
-    def from_directory(
-        cls, directory: Path, with_transcriber: bool = False
-    ) -> RecordingPipeline:
+    def from_directory(cls, directory: Path, with_transcriber: bool = False) -> RecordingPipeline:
         config = load_config()
         account_names = [a.name for a in config.accounts]
         registry = MarkdownRegistryStore(directory / "registry.md", account_names)
@@ -147,14 +145,12 @@ class RecordingPipeline:
                 except Exception as e:
                     errors.append(f"Failed to upload {path}: {e}")
                     upload_failed += 1
-                    logger.exception(f"Upload failed for {path}")
+                    logger.exception("Upload failed for %s", path)
 
             if retry_failed:
                 for entry in entries:
                     failed_accounts = [
-                        name
-                        for name, vid in entry.account_ids.items()
-                        if vid == "—"
+                        name for name, vid in entry.account_ids.items() if vid == "—"
                     ]
                     if not failed_accounts:
                         continue
@@ -173,16 +169,17 @@ class RecordingPipeline:
                             result = retry_adapter.upload(file_path, title)
                             if result:
                                 retry_adapter.assign_playlist(
-                                    result.video_id, entry.playlist,
+                                    result.video_id,
+                                    entry.playlist,
                                 )
                                 self.registry.update_account_id(
-                                    entry.file, acct_name, result.video_id,
+                                    entry.file,
+                                    acct_name,
+                                    result.video_id,
                                 )
                                 uploaded += 1
                         except Exception as e:
-                            errors.append(
-                                f"Retry failed for {entry.file} on {acct_name}: {e}"
-                            )
+                            errors.append(f"Retry failed for {entry.file} on {acct_name}: {e}")
                             upload_failed += 1
 
         finally:
@@ -223,7 +220,8 @@ class RecordingPipeline:
         errors = []
 
         primary_account = next(
-            (a for a in self.config.accounts if a.role == "primary"), None,
+            (a for a in self.config.accounts if a.role == "primary"),
+            None,
         )
         if not primary_account:
             return SyncReport(errors=["No primary account configured"])
@@ -252,11 +250,7 @@ class RecordingPipeline:
                 video_id = entry.account_ids[primary_name]
 
                 # Save to transcripts/{subdir}/{name}.md
-                transcript_path = (
-                    directory
-                    / "transcripts"
-                    / Path(entry.file).with_suffix(".md")
-                )
+                transcript_path = directory / "transcripts" / Path(entry.file).with_suffix(".md")
                 transcript_path.parent.mkdir(parents=True, exist_ok=True)
 
                 if transcript_path.exists() and not force:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -125,6 +126,7 @@ class YtdlpTranscriptAdapter:
                 line = f"{domain}\t{flag}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n"
                 f.write(line)
 
+        os.chmod(str(cookies_txt_path), 0o600)
         return cookies_txt_path
 
     def cleanup(self) -> None:

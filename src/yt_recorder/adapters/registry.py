@@ -310,6 +310,7 @@ class MarkdownRegistryStore:
         try:
             fd, temp_path = tempfile.mkstemp(dir=self.registry_path.parent, text=True)
             try:
+                os.chmod(temp_path, 0o600)
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     f.write(content)
                 os.replace(temp_path, self.registry_path)

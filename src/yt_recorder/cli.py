@@ -13,6 +13,7 @@ from typing import Optional
 def main(verbose: bool) -> None:
     """YouTube recording and transcription pipeline."""
     import logging
+
     level = logging.DEBUG if verbose else logging.WARNING
     logging.basicConfig(
         level=level,
@@ -99,7 +100,9 @@ def transcribe(directory: Path, retry: bool, force: bool) -> None:
 @click.option("--limit", "-n", type=int, help="Max files to upload")
 @click.option("--keep", is_flag=True, help="Keep local files after upload")
 @click.option("--retry-failed", is_flag=True, help="Retry failed mirror uploads")
-def sync(directory: Path, dry_run: bool, limit: Optional[int], keep: bool, retry_failed: bool) -> None:
+def sync(
+    directory: Path, dry_run: bool, limit: Optional[int], keep: bool, retry_failed: bool
+) -> None:
     """Sync recordings (upload + transcribe).
 
     Uploads new videos then fetches transcripts. Transcripts may not be
@@ -117,11 +120,11 @@ def sync(directory: Path, dry_run: bool, limit: Optional[int], keep: bool, retry
         retry_failed=retry_failed,
         dry_run=dry_run,
     )
-    
+
     if dry_run:
         click.echo(f"Would upload {upload_report.skipped} files")
         return
-    
+
     click.echo(f"Uploaded: {upload_report.uploaded}, Failed: {upload_report.upload_failed}")
 
     if upload_report.uploaded > 0:
@@ -248,6 +251,11 @@ def _find_chrome() -> str:
 
 
 def _find_free_port() -> int:
+    """Find free TCP port for Chrome DevTools Protocol.
+
+    Note: Random port selection reduces attack surface but doesn't eliminate
+    the risk. Any local process can scan for and connect to CDP ports.
+    """
     import socket
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -304,6 +312,11 @@ def setup(account: str) -> None:
     cookies_path = config_dir / f"{account}_cookies.txt"
 
     port = _find_free_port()
+
+    click.echo(f"\n⚠️  Chrome CDP debugging port {port} is open during setup.")
+    click.echo("   Any local process can access your Google session until setup completes.")
+    click.echo("   Close Chrome immediately after login capture.")
+
     tmp_profile = tempfile.mkdtemp(prefix="yt-recorder-")
     proc: subprocess.Popen[bytes] | None = None
 
@@ -380,7 +393,7 @@ def setup(account: str) -> None:
     new_lines = []
     for line in config_lines:
         stripped = line.strip()
-        if stripped.startswith(f'{account} ') or stripped.startswith(f'{account}='):
+        if stripped.startswith(f"{account} ") or stripped.startswith(f"{account}="):
             new_lines.append(f'{account} = "{storage_state_path}"')
             account_exists = True
         else:
@@ -399,7 +412,11 @@ def setup(account: str) -> None:
                     inserted = True
                 in_accounts = False
 
-            if in_accounts and not inserted and (line.strip().startswith("#") or line.strip() == ""):
+            if (
+                in_accounts
+                and not inserted
+                and (line.strip().startswith("#") or line.strip() == "")
+            ):
                 final_lines.append(f'{account} = "{storage_state_path}"')
                 inserted = True
 
