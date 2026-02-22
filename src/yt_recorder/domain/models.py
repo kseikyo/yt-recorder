@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from enum import Enum
 from pathlib import Path
 
 
@@ -20,6 +21,22 @@ class TranscriptSegment:
     text: str
 
 
+class TranscriptStatus(str, Enum):
+    """Transcript extraction status.
+
+    States:
+        PENDING: Transcript not yet requested/available
+        DONE: Transcript successfully fetched
+        UNAVAILABLE: YouTube says no transcript exists
+        ERROR: Fetch failed with error (retryable with --retry flag)
+    """
+
+    PENDING = "pending"
+    DONE = "done"
+    UNAVAILABLE = "unavailable"
+    ERROR = "error"
+
+
 @dataclass(frozen=True)
 class RegistryEntry:
     """Registry entry for a recorded video.
@@ -28,7 +45,7 @@ class RegistryEntry:
         file: Relative path from recordings directory (e.g., "folder-a/video1.mp4")
         playlist: Folder→playlist name (e.g., "folder-a")
         uploaded_date: Date when video was uploaded
-        has_transcript: Whether transcript has been extracted
+        transcript_status: Transcript extraction status
         account_ids: Mapping of account names to YouTube video IDs
                      (e.g., {"primary": "abc123", "mirror-1": "xyz789"})
     """
@@ -36,8 +53,13 @@ class RegistryEntry:
     file: str
     playlist: str
     uploaded_date: date
-    has_transcript: bool
+    transcript_status: TranscriptStatus
     account_ids: dict[str, str]
+
+    @property
+    def has_transcript(self) -> bool:
+        """Backwards-compat: True when transcript done."""
+        return self.transcript_status == TranscriptStatus.DONE
 
 
 @dataclass(frozen=True)
