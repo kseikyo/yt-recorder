@@ -209,3 +209,427 @@ class TestRecordingPipeline:
 
         assert report.uploaded == 0
         assert any("file not found" in e for e in report.errors)
+
+
+class TestFetchTranscripts:
+    @pytest.fixture
+    def config(self) -> Config:
+        return Config(
+            accounts=[
+                YouTubeAccount("primary", Path("/tmp/p.json"), Path("/tmp/p.txt"), "primary"),
+                YouTubeAccount("mirror", Path("/tmp/m.json"), Path("/tmp/m.txt"), "mirror"),
+            ],
+            extensions=(".mp4",),
+            exclude_dirs=frozenset(),
+            max_depth=1,
+            transcript_delay=0.0,
+        )
+
+    @pytest.fixture
+    def mock_registry(self) -> Mock:
+        registry = Mock()
+        registry.load = Mock(return_value=[])
+        registry.update_many = Mock()
+        return registry
+
+    @pytest.fixture
+    def mock_raid(self) -> Mock:
+        return Mock()
+
+    @pytest.fixture
+    def mock_transcriber(self, tmp_path: Path) -> Mock:
+        transcriber = Mock()
+        srt_path = tmp_path / ".tmp" / "test.srt"
+        srt_path.parent.mkdir(parents=True, exist_ok=True)
+        srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello world\n\n")
+        transcriber.fetch = Mock(return_value=srt_path)
+        return transcriber
+
+    def _entry(
+        self,
+        file: str = "video.mp4",
+        status: TranscriptStatus = TranscriptStatus.PENDING,
+        video_id: str = "abc123",
+    ) -> RegistryEntry:
+        return RegistryEntry(
+            file=file,
+            playlist="root",
+            uploaded_date=date.today(),
+            transcript_status=status,
+            account_ids={"primary": video_id, "mirror": "def456"},
+        )
+
+    def test_success_updates_to_done(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        mock_transcriber: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [self._entry()]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, mock_transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert report.transcripts_fetched == 1
+        mock_registry.update_many.assert_called_once()
+        updates = mock_registry.update_many.call_args[0][0]
+        assert updates["video.mp4"]["transcript_status"] == TranscriptStatus.DONE
+
+    def test_unavailable_updates_to_unavailable(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [self._entry()]
+        transcriber = Mock()
+        transcriber.fetch.side_effect = TranscriptUnavailableError("No captions")
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert report.transcripts_fetched == 0
+        updates = mock_registry.update_many.call_args[0][0]
+        assert updates["video.mp4"]["transcript_status"] == TranscriptStatus.UNAVAILABLE
+
+    def test_not_ready_stays_pending(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [self._entry()]
+        transcriber = Mock()
+        transcriber.fetch.side_effect = TranscriptNotReadyError("Processing")
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert report.transcripts_pending == 1
+        mock_registry.update_many.assert_not_called()
+
+    def test_generic_exception_updates_to_error(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [self._entry()]
+        transcriber = Mock()
+        transcriber.fetch.side_effect = RuntimeError("Connection timeout")
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        updates = mock_registry.update_many.call_args[0][0]
+        assert updates["video.mp4"]["transcript_status"] == TranscriptStatus.ERROR
+        assert any("Connection timeout" in e for e in report.errors)
+
+    def test_retry_flag_includes_error_state(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        mock_transcriber: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [
+            self._entry(status=TranscriptStatus.ERROR),
+        ]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, mock_transcriber)
+
+        report_no_retry = pipeline.fetch_transcripts(tmp_path, retry=False)
+        assert report_no_retry.transcripts_fetched == 0
+
+        mock_registry.update_many.reset_mock()
+
+        report_retry = pipeline.fetch_transcripts(tmp_path, retry=True)
+        assert report_retry.transcripts_fetched == 1
+
+    def test_force_flag_processes_all(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        mock_transcriber: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [
+            self._entry(file="done.mp4", status=TranscriptStatus.DONE, video_id="d1"),
+            self._entry(file="unavail.mp4", status=TranscriptStatus.UNAVAILABLE, video_id="u1"),
+        ]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, mock_transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path, force=True)
+
+        assert report.transcripts_fetched == 2
+
+    def test_no_primary_account(
+        self,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        config = Config(
+            accounts=[
+                YouTubeAccount("mirror", Path("/tmp/m.json"), Path("/tmp/m.txt"), "mirror"),
+            ],
+        )
+        transcriber = Mock()
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert "No primary account" in report.errors[0]
+
+    def test_no_transcriber(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber=None)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert "Transcriber not initialized" in report.errors[0]
+
+    def test_empty_registry(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = []
+        transcriber = Mock()
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert report.transcripts_fetched == 0
+        assert report.transcripts_pending == 0
+
+    def test_batch_update_called_once(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        mock_transcriber: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [
+            self._entry(file="v1.mp4", video_id="id1"),
+            self._entry(file="v2.mp4", video_id="id2"),
+            self._entry(file="v3.mp4", video_id="id3"),
+        ]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid, mock_transcriber)
+
+        report = pipeline.fetch_transcripts(tmp_path)
+
+        assert report.transcripts_fetched == 3
+        mock_registry.update_many.assert_called_once()
+        updates = mock_registry.update_many.call_args[0][0]
+        assert len(updates) == 3
+
+
+class TestCleanSynced:
+    @pytest.fixture
+    def config(self) -> Config:
+        return Config(
+            accounts=[
+                YouTubeAccount("primary", Path("/tmp/p.json"), Path("/tmp/p.txt"), "primary"),
+                YouTubeAccount("mirror", Path("/tmp/m.json"), Path("/tmp/m.txt"), "mirror"),
+            ],
+        )
+
+    @pytest.fixture
+    def mock_registry(self) -> Mock:
+        registry = Mock()
+        registry.load = Mock(return_value=[])
+        return registry
+
+    @pytest.fixture
+    def mock_raid(self) -> Mock:
+        return Mock()
+
+    def _entry(
+        self,
+        file: str = "video.mp4",
+        status: TranscriptStatus = TranscriptStatus.DONE,
+        accounts: dict[str, str] | None = None,
+    ) -> RegistryEntry:
+        if accounts is None:
+            accounts = {"primary": "abc123", "mirror": "def456"}
+        return RegistryEntry(
+            file=file,
+            playlist="root",
+            uploaded_date=date.today(),
+            transcript_status=status,
+            account_ids=accounts,
+        )
+
+    def test_deletes_when_all_accounts_and_done(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry()]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 1
+        assert not (tmp_path / "video.mp4").exists()
+
+    def test_deletes_when_all_accounts_and_unavailable(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry(status=TranscriptStatus.UNAVAILABLE)]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 1
+
+    def test_skips_pending(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry(status=TranscriptStatus.PENDING)]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
+        assert report.skipped == 1
+        assert (tmp_path / "video.mp4").exists()
+
+    def test_skips_error(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry(status=TranscriptStatus.ERROR)]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
+        assert report.skipped == 1
+
+    def test_skips_missing_account(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [
+            self._entry(accounts={"primary": "abc123", "mirror": "\u2014"})
+        ]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
+        assert report.skipped == 1
+
+    def test_skips_file_not_on_disk(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = [self._entry()]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
+
+    def test_dry_run_populates_eligible(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry()]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path, dry_run=True)
+
+        assert report.eligible == ["video.mp4"]
+        assert report.deleted == 0
+        assert (tmp_path / "video.mp4").exists()
+
+    def test_oserror_reported_in_errors(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "video.mp4").write_text("data")
+        mock_registry.load.return_value = [self._entry()]
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        with patch.object(Path, "unlink", side_effect=OSError("Permission denied")):
+            report = pipeline.clean_synced(tmp_path)
+
+        assert len(report.errors) == 1
+        assert "Permission denied" in report.errors[0]
+
+    def test_empty_registry(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.return_value = []
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
+        assert report.skipped == 0
+
+    def test_missing_registry(
+        self,
+        config: Config,
+        mock_registry: Mock,
+        mock_raid: Mock,
+        tmp_path: Path,
+    ) -> None:
+        mock_registry.load.side_effect = RegistryFileNotFoundError
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+
+        report = pipeline.clean_synced(tmp_path)
+
+        assert report.deleted == 0
