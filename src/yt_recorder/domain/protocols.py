@@ -99,12 +99,12 @@ class RegistryStore(Protocol):
         """
         ...
 
-    def update_transcript(self, file: str, status: str) -> None:
+    def update_transcript(self, file: str, status: bool) -> None:
         """Update transcript status for a file.
 
         Args:
             file: Relative path from recordings directory
-            status: New transcript status
+            status: Whether transcript exists
         """
         ...
 

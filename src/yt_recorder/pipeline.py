@@ -18,6 +18,7 @@ from yt_recorder.adapters.registry import MarkdownRegistryStore
 from yt_recorder.adapters.scanner import scan_recordings
 from yt_recorder.adapters.raid import RaidAdapter
 from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
+from yt_recorder.domain.protocols import RegistryStore, TranscriptFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,9 @@ class RecordingPipeline:
     def __init__(
         self,
         config: Config,
-        registry: MarkdownRegistryStore,
+        registry: RegistryStore,
         raid: RaidAdapter,
-        transcriber: YtdlpTranscriptAdapter | None = None,
+        transcriber: TranscriptFetcher | None = None,
     ):
         self.config = config
         self.registry = registry
@@ -49,6 +50,7 @@ class RecordingPipeline:
                 cookies_path=config.accounts[0].cookies_path,
                 output_dir=directory / ".tmp",
             )
+            transcriber.extract_cookies(config.accounts[0].storage_state)
         return cls(config, registry, raid, transcriber)
 
     def upload_new(
@@ -242,8 +244,6 @@ class RecordingPipeline:
 
         if not entries_needing_transcripts:
             return SyncReport(transcripts_fetched=0, transcripts_pending=0)
-
-        self.transcriber.extract_cookies(primary_account.storage_state)
 
         for entry in entries_needing_transcripts:
             try:
