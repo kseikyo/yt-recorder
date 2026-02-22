@@ -18,40 +18,9 @@ from yt_recorder.domain.exceptions import (
     UploadTimeoutError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
+from yt_recorder.utils import find_chrome
 
 logger = logging.getLogger(__name__)
-
-
-def _find_chrome() -> str:
-    system = platform.system().lower()
-    candidates: list[str] = []
-
-    if system == "darwin":
-        candidates = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        ]
-    elif system == "linux":
-        for name in ("google-chrome", "google-chrome-stable", "chromium-browser", "chromium"):
-            found = shutil.which(name)
-            if found:
-                candidates.append(found)
-    elif system == "windows":
-        candidates = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        ]
-
-    for path in candidates:
-        if Path(path).exists():
-            return path
-
-    raise FileNotFoundError(
-        "Chrome/Chromium not found. Install Google Chrome.\n"
-        "  macOS: brew install --cask google-chrome\n"
-        "  Linux: apt install google-chrome-stable\n"
-        "  Windows: https://google.com/chrome"
-    )
 
 
 class YouTubeBrowserAdapter:
@@ -85,7 +54,7 @@ class YouTubeBrowserAdapter:
             raise SessionExpiredError("Session expired, redirected to login")
 
     def open(self) -> None:
-        chrome_path = _find_chrome()
+        chrome_path = find_chrome()
         self._playwright = sync_playwright().start()
         self.browser = self._playwright.chromium.launch(
             headless=self.headless,

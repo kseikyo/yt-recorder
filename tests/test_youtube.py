@@ -98,7 +98,7 @@ class TestCheckSessionExpired:
 
 
 class TestOpen:
-    @patch("yt_recorder.adapters.youtube._find_chrome")
+    @patch("yt_recorder.utils.find_chrome")
     @patch("yt_recorder.adapters.youtube.sync_playwright")
     def test_open_launches_browser(
         self, mock_sync_playwright: Mock, mock_find_chrome: Mock, adapter: YouTubeBrowserAdapter

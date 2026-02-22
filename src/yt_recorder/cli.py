@@ -6,6 +6,8 @@ import click
 from pathlib import Path
 from typing import Optional
 
+from yt_recorder.utils import find_chrome
+
 
 @click.group()
 @click.version_option()
@@ -215,41 +217,6 @@ def status(directory: Path) -> None:
     )
 
 
-def _find_chrome() -> str:
-    import platform
-    import shutil
-
-    system = platform.system().lower()
-    candidates: list[str] = []
-
-    if system == "darwin":
-        candidates = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        ]
-    elif system == "linux":
-        for name in ("google-chrome", "google-chrome-stable", "chromium-browser", "chromium"):
-            found = shutil.which(name)
-            if found:
-                candidates.append(found)
-    elif system == "windows":
-        candidates = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        ]
-
-    for path in candidates:
-        if Path(path).exists():
-            return path
-
-    raise FileNotFoundError(
-        "Chrome/Chromium not found. Install Google Chrome and try again.\n"
-        "  macOS: brew install --cask google-chrome\n"
-        "  Linux: apt install google-chrome-stable\n"
-        "  Windows: https://google.com/chrome"
-    )
-
-
 def _find_free_port() -> int:
     """Find free TCP port for Chrome DevTools Protocol.
 
@@ -299,7 +266,7 @@ def setup(account: str) -> None:
     click.echo(f"Setting up account: {account}")
 
     try:
-        chrome_path = _find_chrome()
+        chrome_path = find_chrome()
     except FileNotFoundError as e:
         raise click.ClickException(str(e)) from e
 
