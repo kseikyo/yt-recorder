@@ -25,3 +25,8 @@ CAPTCHA_INDICATOR = "iframe[src*='recaptcha'], div#captcha-container"
 
 # Default upload timeout (30 minutes)
 UPLOAD_TIMEOUT_SECONDS = 30 * 60
+
+# Playlist assignment selectors
+PLAYLIST_DROPDOWN = 'tp-yt-paper-button[aria-label*="Playlist"]'
+PLAYLIST_OPTION_TEMPLATE = "tp-yt-paper-item:has-text('{name}')"
+PLAYLIST_SAVE = "tp-yt-button-shape[aria-label='Save']"

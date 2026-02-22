@@ -216,7 +216,7 @@ class YouTubeBrowserAdapter:
 
             self._random_delay("nav")
 
-            playlist_dropdown = page.query_selector("tp-yt-paper-button[aria-label*='Playlist']")
+            playlist_dropdown = page.query_selector(constants.PLAYLIST_DROPDOWN)
             if not playlist_dropdown:
                 logger.warning("Playlist dropdown not found for video %s", video_id)
                 return
@@ -224,7 +224,9 @@ class YouTubeBrowserAdapter:
             playlist_dropdown.click()
             self._random_delay("field")
 
-            playlist_option = page.query_selector(f"tp-yt-paper-item:has-text('{playlist_name}')")
+            playlist_option = page.query_selector(
+                constants.PLAYLIST_OPTION_TEMPLATE.format(name=playlist_name)
+            )
             if not playlist_option:
                 logger.warning("Playlist '%s' not found for video %s", playlist_name, video_id)
                 return
@@ -232,7 +234,7 @@ class YouTubeBrowserAdapter:
             playlist_option.click()
             self._random_delay("field")
 
-            save_btn = page.query_selector("tp-yt-button-shape[aria-label='Save']")
+            save_btn = page.query_selector(constants.PLAYLIST_SAVE)
             if not save_btn:
                 logger.warning("Save button not found for video %s", video_id)
                 return
