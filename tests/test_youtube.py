@@ -98,7 +98,7 @@ class TestCheckSessionExpired:
 
 
 class TestOpen:
-    @patch("yt_recorder.utils.find_chrome")
+    @patch("yt_recorder.adapters.youtube.find_chrome")
     @patch("yt_recorder.adapters.youtube.sync_playwright")
     def test_open_launches_browser(
         self, mock_sync_playwright: Mock, mock_find_chrome: Mock, adapter: YouTubeBrowserAdapter
@@ -106,9 +106,8 @@ class TestOpen:
         mock_playwright = Mock()
         mock_browser = Mock()
         mock_context = Mock()
-        mock_chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-        mock_find_chrome.return_value = mock_chrome_path
+        mock_chrome_path = mock_find_chrome.return_value
         mock_sync_playwright.return_value.start.return_value = mock_playwright
         mock_playwright.chromium.launch.return_value = mock_browser
         mock_browser.new_context.return_value = mock_context
