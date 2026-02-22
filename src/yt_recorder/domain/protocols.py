@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from yt_recorder.domain.models import RegistryEntry, UploadResult
+from yt_recorder.domain.models import RegistryEntry, TranscriptStatus, UploadResult
 
 
 @runtime_checkable
@@ -99,12 +99,12 @@ class RegistryStore(Protocol):
         """
         ...
 
-    def update_transcript(self, file: str, status: bool) -> None:
+    def update_transcript(self, file: str, status: TranscriptStatus) -> None:
         """Update transcript status for a file.
 
         Args:
             file: Relative path from recordings directory
-            status: Whether transcript exists
+            status: TranscriptStatus enum value
         """
         ...
 
@@ -124,6 +124,6 @@ class RegistryStore(Protocol):
         Args:
             updates: Mapping of file paths to update dictionaries.
                      Each update dict contains field names and new values.
-                     Example: {"video1.mp4": {"has_transcript": True}}
+                     Example: {"video1.mp4": {"transcript_status": TranscriptStatus.DONE}}
         """
         ...

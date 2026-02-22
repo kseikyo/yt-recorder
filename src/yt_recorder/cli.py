@@ -140,6 +140,16 @@ def sync(
     )
 
 
+def _transcript_icon(status_value: str) -> str:
+    icons: dict[str, str] = {
+        "done": "📝",
+        "pending": "⏳",
+        "unavailable": "🚫",
+        "error": "❌",
+    }
+    return icons.get(status_value, "?")
+
+
 @main.command()
 @click.argument(
     "directory", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path)
@@ -160,7 +170,6 @@ def status(directory: Path) -> None:
     except (FileNotFoundError, RegistryFileNotFoundError, RegistryParseError):
         entries = []
 
-    # Scan directory
     files = scan_recordings(
         directory,
         list(config.extensions),
@@ -168,7 +177,6 @@ def status(directory: Path) -> None:
         config.max_depth,
     )
 
-    # Build status map
     entry_map = {e.file: e for e in entries}
 
     click.echo(f"📁 {directory.name}/ ({len(files)} files)")
@@ -183,15 +191,11 @@ def status(directory: Path) -> None:
 
         if entry:
             uploaded += 1
-
-            # Check transcript status
+            icon = _transcript_icon(entry.transcript_status.value)
+            click.echo(f"  ✅ {rel_path} [{entry.transcript_status.value}] {icon}")
             if entry.has_transcript:
-                click.echo(f"  ✅ {rel_path} [transcribed] 📝")
                 transcribed += 1
-            else:
-                click.echo(f"  ✅ {rel_path} [no transcript] ⏳")
 
-            # Check for mirror failures
             for account, video_id in entry.account_ids.items():
                 if video_id == "—":
                     mirror_failures += 1
@@ -202,16 +206,14 @@ def status(directory: Path) -> None:
     for entry in entries:
         if entry.file not in scanned_paths:
             uploaded += 1
+            icon = _transcript_icon(entry.transcript_status.value)
+            click.echo(f"  ☁️  {entry.file} [{entry.transcript_status.value}] {icon}")
             if entry.has_transcript:
-                click.echo(f"  ☁️  {entry.file} [uploaded, transcribed] 📝")
                 transcribed += 1
-            else:
-                click.echo(f"  ☁️  {entry.file} [uploaded, file deleted] ✅")
             for acct_name, video_id in entry.account_ids.items():
                 if video_id == "—":
                     mirror_failures += 1
 
-    # Summary
     click.echo(
         f"\nUploaded: {uploaded}/{len(files)} | Transcribed: {transcribed}/{uploaded} | Mirror failures: {mirror_failures}"
     )

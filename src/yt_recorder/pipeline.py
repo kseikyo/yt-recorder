@@ -8,7 +8,7 @@ from typing import Callable, Optional
 
 from yt_recorder.config import Config, load_config
 from yt_recorder.domain.formatters import title_from_filename, format_transcript_md, parse_srt
-from yt_recorder.domain.models import RegistryEntry, SyncReport, UploadResult
+from yt_recorder.domain.models import RegistryEntry, SyncReport, TranscriptStatus, UploadResult
 from yt_recorder.domain.exceptions import (
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
@@ -126,7 +126,7 @@ class RecordingPipeline:
                         file=str(path.relative_to(directory)),
                         playlist=playlist,
                         uploaded_date=date.today(),
-                        has_transcript=False,
+                        transcript_status=TranscriptStatus.PENDING,
                         account_ids={
                             name: (r.video_id if r else "—") for name, r in results.items()
                         },
@@ -208,8 +208,8 @@ class RecordingPipeline:
 
         Args:
             directory: Recordings directory
-            retry: Retry previously failed transcripts
-            force: Overwrite existing transcripts
+            retry: Retry previously ERROR transcripts
+            force: Overwrite existing transcripts (all states)
 
         Returns:
             SyncReport with transcript statistics
@@ -219,7 +219,7 @@ class RecordingPipeline:
 
         fetched = 0
         pending = 0
-        errors = []
+        errors: list[str] = []
 
         primary_account = next(
             (a for a in self.config.accounts if a.role == "primary"),
@@ -234,18 +234,26 @@ class RecordingPipeline:
             entries = self.registry.load()
         except RegistryFileNotFoundError:
             entries = []
-        entries_needing_transcripts = [
+
+        retryable: set[TranscriptStatus] = {TranscriptStatus.PENDING}
+        if retry:
+            retryable.add(TranscriptStatus.ERROR)
+
+        entries_needing = [
             e
             for e in entries
-            if (force or not e.has_transcript)
+            if (force or e.transcript_status in retryable)
             and e.account_ids.get(primary_name)
             and e.account_ids[primary_name] != "—"
         ]
 
-        if not entries_needing_transcripts:
+        if not entries_needing:
             return SyncReport(transcripts_fetched=0, transcripts_pending=0)
 
-        for entry in entries_needing_transcripts:
+        # Collect results — don't update registry per-entry
+        results: dict[str, TranscriptStatus] = {}
+
+        for entry in entries_needing:
             try:
                 video_id = entry.account_ids[primary_name]
 
@@ -268,9 +276,7 @@ class RecordingPipeline:
                 md_content = format_transcript_md(segments, video_url, entry.file)
 
                 transcript_path.write_text(md_content)
-
-                # Update registry
-                self.registry.update_transcript(entry.file, True)
+                results[entry.file] = TranscriptStatus.DONE
                 fetched += 1
 
                 # Rate limiting
@@ -278,11 +284,18 @@ class RecordingPipeline:
 
             except TranscriptNotReadyError:
                 pending += 1
-                errors.append(f"Transcript not ready for {entry.file} — try again later")
+                # stays PENDING — not in results
             except TranscriptUnavailableError:
+                results[entry.file] = TranscriptStatus.UNAVAILABLE
                 errors.append(f"No transcript available for {entry.file}")
             except Exception as e:
+                results[entry.file] = TranscriptStatus.ERROR
                 errors.append(f"Failed to fetch transcript for {entry.file}: {e}")
+
+        if results:
+            self.registry.update_many(
+                {f: {"transcript_status": status} for f, status in results.items()}
+            )
 
         return SyncReport(
             transcripts_fetched=fetched,

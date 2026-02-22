@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from yt_recorder.config import Config
-from yt_recorder.domain.models import RegistryEntry, UploadResult, YouTubeAccount
+from yt_recorder.domain.models import RegistryEntry, TranscriptStatus, UploadResult, YouTubeAccount
 from yt_recorder.pipeline import RecordingPipeline
 
 
@@ -127,7 +127,7 @@ class TestRecordingPipeline:
         """Test already-registered files are skipped."""
         (tmp_path / "test.mp4").write_text("fake video")
         mock_registry.load = Mock(
-            return_value=[RegistryEntry("test.mp4", "", date.today(), False, {})]
+            return_value=[RegistryEntry("test.mp4", "", date.today(), TranscriptStatus.PENDING, {})]
         )
 
         pipeline = RecordingPipeline(config, mock_registry, mock_raid)
@@ -153,15 +153,23 @@ class TestRecordingPipeline:
         (tmp_path / "test.mp4").write_text("fake video")
         mirror_adapter = mock_raid._adapters["mirror"]
         mirror_adapter.upload.return_value = UploadResult(
-            "new456", "https://youtu.be/new456", "Test", "mirror",
+            "new456",
+            "https://youtu.be/new456",
+            "Test",
+            "mirror",
         )
 
-        mock_registry.load = Mock(return_value=[
-            RegistryEntry(
-                "test.mp4", "root", date.today(), False,
-                {"primary": "abc123", "mirror": "—"},
-            )
-        ])
+        mock_registry.load = Mock(
+            return_value=[
+                RegistryEntry(
+                    "test.mp4",
+                    "root",
+                    date.today(),
+                    TranscriptStatus.PENDING,
+                    {"primary": "abc123", "mirror": "—"},
+                )
+            ]
+        )
 
         pipeline = RecordingPipeline(config, mock_registry, mock_raid)
         report = pipeline.upload_new(tmp_path, retry_failed=True)
@@ -170,19 +178,26 @@ class TestRecordingPipeline:
         mirror_adapter.upload.assert_called_once()
         mirror_adapter.assign_playlist.assert_called_once_with("new456", "root")
         mock_registry.update_account_id.assert_called_once_with(
-            "test.mp4", "mirror", "new456",
+            "test.mp4",
+            "mirror",
+            "new456",
         )
 
     def test_retry_failed_missing_file(
         self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
     ) -> None:
         """C2: retry reports error when local file is deleted."""
-        mock_registry.load = Mock(return_value=[
-            RegistryEntry(
-                "gone.mp4", "root", date.today(), False,
-                {"primary": "abc123", "mirror": "—"},
-            )
-        ])
+        mock_registry.load = Mock(
+            return_value=[
+                RegistryEntry(
+                    "gone.mp4",
+                    "root",
+                    date.today(),
+                    TranscriptStatus.PENDING,
+                    {"primary": "abc123", "mirror": "—"},
+                )
+            ]
+        )
 
         pipeline = RecordingPipeline(config, mock_registry, mock_raid)
         report = pipeline.upload_new(tmp_path, retry_failed=True)
