@@ -44,10 +44,13 @@ class TestRecordingPipeline:
         raid.open = Mock()
         raid.close = Mock()
         raid.upload = Mock(
-            return_value={
-                "primary": UploadResult("abc123", "https://youtu.be/abc123", "Test", "primary"),
-                "mirror": UploadResult("def456", "https://youtu.be/def456", "Test", "mirror"),
-            }
+            return_value=(
+                {
+                    "primary": UploadResult("abc123", "https://youtu.be/abc123", "Test", "primary"),
+                    "mirror": UploadResult("def456", "https://youtu.be/def456", "Test", "mirror"),
+                },
+                0,
+            )
         )
         raid._adapters = {
             "primary": Mock(),
@@ -100,10 +103,13 @@ class TestRecordingPipeline:
         """Test file is kept if any mirror fails."""
         (tmp_path / "test.mp4").write_text("fake video")
         mock_raid.upload = Mock(
-            return_value={
-                "primary": UploadResult("abc123", "https://youtu.be/abc123", "Test", "primary"),
-                "mirror": None,  # Mirror failed
-            }
+            return_value=(
+                {
+                    "primary": UploadResult("abc123", "https://youtu.be/abc123", "Test", "primary"),
+                    "mirror": None,
+                },
+                0,
+            )
         )
 
         pipeline = RecordingPipeline(config, mock_registry, mock_raid)

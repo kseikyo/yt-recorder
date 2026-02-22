@@ -71,7 +71,9 @@ class RaidAdapter:
             raise ValueError(f"Account '{account_name}' not found. Available: {available}")
         return adapter
 
-    def upload(self, path: Path, title: str, playlist: str) -> dict[str, UploadResult | None]:
+    def upload(
+        self, path: Path, title: str, playlist: str
+    ) -> tuple[dict[str, UploadResult | None], int]:
         """Upload to all accounts.
 
         Primary first (must succeed). Mirrors best-effort (failures logged as None).
@@ -82,9 +84,10 @@ class RaidAdapter:
             playlist: Playlist name to assign
 
         Returns:
-            dict mapping account name to UploadResult or None if failed.
+            Tuple of (account results dict, playlist_failures count).
         """
         results: dict[str, UploadResult | None] = {}
+        playlist_failures = 0
 
         primary_adapter = self._adapters[self.primary.name]
         primary_result = primary_adapter.upload(path, title)
@@ -92,6 +95,7 @@ class RaidAdapter:
         playlist_ok = primary_adapter.assign_playlist(primary_result.video_id, playlist)
         if not playlist_ok:
             logger.warning("Playlist assignment failed for %s on %s", playlist, self.primary.name)
+            playlist_failures += 1
 
         for mirror in self.mirrors:
             try:
@@ -101,8 +105,9 @@ class RaidAdapter:
                 playlist_ok = mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
                 if not playlist_ok:
                     logger.warning("Playlist assignment failed for %s on %s", playlist, mirror.name)
+                    playlist_failures += 1
             except Exception as e:
                 logger.warning("Mirror %s failed: %s", mirror.name, e)
                 results[mirror.name] = None
 
-        return results
+        return results, playlist_failures

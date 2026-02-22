@@ -68,6 +68,8 @@ def upload(
     click.echo(f"Failed: {report.upload_failed}")
     click.echo(f"Deleted: {report.deleted_count}")
     click.echo(f"Kept: {report.kept_count}")
+    if report.playlist_failed:
+        click.echo(f"Playlist failures: {report.playlist_failed}")
 
     if report.errors:
         click.echo("\nErrors:")

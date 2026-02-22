@@ -79,7 +79,9 @@ class TestRaidAdapter:
             accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
         )
         raid.open()
-        results = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        results, playlist_failures = raid.upload(
+            Path("/tmp/test.mp4"), "Test Title", "test-playlist"
+        )
         raid.close()
 
         assert "primary" in results
@@ -94,7 +96,7 @@ class TestRaidAdapter:
             accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
         )
         raid.open()
-        raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        _results, _pf = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
         raid.close()
 
         assert mock_adapter.assign_playlist.call_count == 3
@@ -120,7 +122,7 @@ class TestRaidAdapter:
 
         raid = RaidAdapter(accounts, headless=True, delays={}, adapter_factory=factory)
         raid.open()
-        results = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        results, _pf = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
         raid.close()
 
         assert results["primary"] is not None
@@ -150,10 +152,57 @@ class TestRaidAdapter:
 
         raid = RaidAdapter(accounts, headless=True, delays={}, adapter_factory=factory)
         raid.open()
-        raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        _results, _pf = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
         raid.close()
 
         assert call_order[0] == "primary"
+
+    def test_playlist_failure_counted(self, accounts: list[YouTubeAccount]) -> None:
+        def factory(acct: YouTubeAccount) -> Mock:
+            adapter = Mock()
+            adapter.open = Mock()
+            adapter.close = Mock()
+            adapter.upload = Mock(
+                return_value=UploadResult(
+                    video_id="abc123",
+                    url="https://youtu.be/abc123",
+                    title="Test Video",
+                    account_name=acct.name,
+                )
+            )
+            adapter.assign_playlist = Mock(return_value=False)
+            return adapter
+
+        raid = RaidAdapter(accounts, headless=True, delays={}, adapter_factory=factory)
+        raid.open()
+        results, failures = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        raid.close()
+
+        assert failures == 3
+        assert all(r is not None for r in results.values())
+
+    def test_playlist_failure_primary_only(self, accounts: list[YouTubeAccount]) -> None:
+        def factory(acct: YouTubeAccount) -> Mock:
+            adapter = Mock()
+            adapter.open = Mock()
+            adapter.close = Mock()
+            adapter.upload = Mock(
+                return_value=UploadResult(
+                    video_id="abc123",
+                    url="https://youtu.be/abc123",
+                    title="Test Video",
+                    account_name=acct.name,
+                )
+            )
+            adapter.assign_playlist = Mock(return_value=(acct.role != "primary"))
+            return adapter
+
+        raid = RaidAdapter(accounts, headless=True, delays={}, adapter_factory=factory)
+        raid.open()
+        _results, failures = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
+        raid.close()
+
+        assert failures == 1
 
     def test_empty_accounts_raises_error(self) -> None:
         with pytest.raises(ValueError, match="No accounts configured"):
