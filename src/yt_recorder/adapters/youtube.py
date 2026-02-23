@@ -51,6 +51,12 @@ class YouTubeBrowserAdapter:
         if "accounts.google.com" in page.url:
             raise SessionExpiredError("Session expired, redirected to login")
 
+    def _wait_for_scrim_dismissed(self, page: Page, timeout: int = 10000) -> None:
+        try:
+            page.wait_for_selector(constants.DIALOG_SCRIM, state="hidden", timeout=timeout)
+        except TimeoutError:
+            pass
+
     def open(self) -> None:
         chrome_path = find_chrome()
         self._playwright = sync_playwright().start()
@@ -103,28 +109,31 @@ class YouTubeBrowserAdapter:
 
             self._random_delay("field")
 
-            not_for_kids = page.query_selector(constants.NOT_MADE_FOR_KIDS)
+            not_for_kids = page.wait_for_selector(constants.NOT_MADE_FOR_KIDS, timeout=10000)
             if not not_for_kids:
                 raise SelectorChangedError("Not made for kids selector not found")
+            self._wait_for_scrim_dismissed(page)
             not_for_kids.click()
 
             self._random_delay("nav")
 
+            self._wait_for_scrim_dismissed(page)
             for _ in range(3):
-                next_btn = page.query_selector(constants.NEXT_BUTTON)
+                next_btn = page.wait_for_selector(constants.NEXT_BUTTON, timeout=10000)
                 if not next_btn:
                     raise SelectorChangedError("Next button selector not found")
                 next_btn.click()
                 self._random_delay("nav")
 
-            private_radio = page.query_selector(constants.PRIVATE_RADIO)
+            self._wait_for_scrim_dismissed(page)
+            private_radio = page.wait_for_selector(constants.PRIVATE_RADIO, timeout=10000)
             if not private_radio:
                 raise SelectorChangedError("Private radio selector not found")
             private_radio.click()
 
             self._random_delay("field")
 
-            video_url_elem = page.query_selector(constants.VIDEO_URL_ELEMENT)
+            video_url_elem = page.wait_for_selector(constants.VIDEO_URL_ELEMENT, timeout=10000)
             if not video_url_elem:
                 raise SelectorChangedError("Video URL element not found")
             video_url = video_url_elem.get_attribute("href")
@@ -167,6 +176,9 @@ class YouTubeBrowserAdapter:
                 title=title,
                 account_name=self.account.name,
             )
+        except Exception:
+            page.screenshot(path=f"/tmp/yt-recorder-debug-upload-{int(time.time())}.png")
+            raise
         finally:
             page.close()
 
@@ -183,31 +195,82 @@ class YouTubeBrowserAdapter:
 
             self._random_delay("nav")
 
-            playlist_dropdown = page.query_selector(constants.PLAYLIST_DROPDOWN)
-            if not playlist_dropdown:
-                logger.warning("Playlist dropdown not found for video %s", video_id)
-                return False
-
-            playlist_dropdown.click()
+            # Wait for page to fully load, click playlist trigger
+            try:
+                trigger = page.wait_for_selector(constants.PLAYLIST_TRIGGER, timeout=15000)
+            except TimeoutError as e:
+                raise SelectorChangedError("Playlist trigger not found") from e
+            if not trigger:
+                raise SelectorChangedError("Playlist trigger not found")
+            trigger.click()
             self._random_delay("field")
 
-            playlist_option = page.query_selector(
-                constants.PLAYLIST_OPTION_TEMPLATE.format(name=playlist_name)
-            )
-            if not playlist_option:
-                logger.warning("Playlist '%s' not found for video %s", playlist_name, video_id)
-                return False
+            # Wait for playlist dialog to open
+            try:
+                search_input = page.wait_for_selector(constants.PLAYLIST_SEARCH_INPUT, timeout=5000)
+            except TimeoutError as e:
+                raise SelectorChangedError("Playlist dialog did not open") from e
+            if not search_input:
+                raise SelectorChangedError("Playlist search input not found")
 
-            playlist_option.click()
+            # Type playlist name into search (handles special chars safely)
+            search_input.fill(playlist_name)
             self._random_delay("field")
 
-            save_btn = page.query_selector(constants.PLAYLIST_SAVE)
+            # Wait for matching playlist item
+            item_selector = constants.PLAYLIST_ITEM_TEMPLATE.format(name=playlist_name)
+            try:
+                playlist_item = page.wait_for_selector(item_selector, timeout=5000)
+            except TimeoutError:
+                logger.warning(
+                    "Playlist '%s' not found for video %s",
+                    playlist_name,
+                    video_id,
+                )
+                return False
+            if not playlist_item:
+                logger.warning(
+                    "Playlist '%s' not found for video %s",
+                    playlist_name,
+                    video_id,
+                )
+                return False
+            playlist_item.click()
+            self._random_delay("field")
+
+            # Click done to close playlist dialog
+            try:
+                done_btn = page.wait_for_selector(constants.PLAYLIST_DONE, timeout=5000)
+            except TimeoutError as e:
+                raise SelectorChangedError("Playlist done button not found") from e
+            if not done_btn:
+                raise SelectorChangedError("Playlist done button not found")
+            done_btn.click()
+            self._random_delay("field")
+
+            # Page-level save (required after dialog closes)
+            try:
+                save_btn = page.wait_for_selector(constants.PLAYLIST_PAGE_SAVE, timeout=5000)
+            except TimeoutError as e:
+                raise SelectorChangedError("Page save button not found") from e
             if not save_btn:
-                logger.warning("Save button not found for video %s", video_id)
-                return False
-
+                raise SelectorChangedError("Page save button not found")
             save_btn.click()
+
+            # Wait for save to complete (button becomes disabled)
+            page.wait_for_function(
+                """() => {
+                    const btn = document.querySelector('ytcp-button#save');
+                    if (!btn) return false;
+                    return btn.getAttribute('aria-disabled') === 'true';
+                }""",
+                timeout=10000,
+            )
+
             self._random_delay("post")
             return True
+        except Exception:
+            page.screenshot(path=f"/tmp/yt-recorder-debug-playlist-{video_id}.png")
+            raise
         finally:
             page.close()

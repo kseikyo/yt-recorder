@@ -14,6 +14,9 @@ NEXT_BUTTON = "#next-button"
 PRIVATE_RADIO = 'tp-yt-paper-radio-button[name="PRIVATE"]'
 DONE_BUTTON = "#done-button"
 
+# Dialog scrim overlay
+DIALOG_SCRIM = "tp-yt-iron-overlay-backdrop"
+
 # Video URL extraction
 VIDEO_URL_ELEMENT = "span.video-url-fadeable a"
 
@@ -27,6 +30,10 @@ CAPTCHA_INDICATOR = "iframe[src*='recaptcha'], div#captcha-container"
 UPLOAD_TIMEOUT_SECONDS = 30 * 60
 
 # Playlist assignment selectors
-PLAYLIST_DROPDOWN = 'tp-yt-paper-button[aria-label*="Playlist"]'
-PLAYLIST_OPTION_TEMPLATE = "tp-yt-paper-item:has-text('{name}')"
-PLAYLIST_SAVE = "tp-yt-button-shape[aria-label='Save']"
+PLAYLIST_TRIGGER = (
+    'ytcp-video-metadata-playlists ytcp-dropdown-trigger[aria-label="Select playlists"]'
+)
+PLAYLIST_SEARCH_INPUT = "ytcp-playlist-dialog #search-input"
+PLAYLIST_ITEM_TEMPLATE = '#items tp-yt-paper-checkbox:has-text("{name}")'
+PLAYLIST_DONE = "ytcp-button.done-button"
+PLAYLIST_PAGE_SAVE = "ytcp-button#save"
