@@ -143,6 +143,88 @@ def sync(directory: Path, dry_run: bool, limit: int | None, keep: bool, retry_fa
     )
 
 
+@main.command()
+@click.argument(
+    "directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=False,
+    default=None,
+)
+@click.option("--video-id", help="Single video ID to assign")
+@click.option("--name", help="Playlist name (required with --video-id)")
+@click.option("--dry-run", is_flag=True, help="Show plan without assigning")
+@click.option("--account", help="Use specific account only")
+def playlist(
+    directory: Path | None,
+    video_id: str | None,
+    name: str | None,
+    dry_run: bool,
+    account: str | None,
+) -> None:
+    """Assign playlists to uploaded videos.
+
+    Assign videos to playlists either in batch from a directory registry,
+    or assign a single video by ID.
+    """
+    if video_id and not name:
+        click.echo("Error: --name required with --video-id")
+        sys.exit(1)
+    if name and not video_id:
+        click.echo("Error: --video-id required with --name")
+        sys.exit(1)
+    if directory and video_id:
+        click.echo("Error: Provide either DIRECTORY or both --video-id and --name, not both")
+        sys.exit(1)
+    if not directory and not video_id:
+        click.echo("Error: Provide either DIRECTORY or both --video-id and --name")
+        sys.exit(1)
+
+    if directory:
+        from yt_recorder.pipeline import RecordingPipeline
+
+        def on_progress(account_name: str, vid_id: str, playlist_name: str, success: bool) -> None:
+            symbol = "✓" if success else "✗"
+            click.echo(f"{symbol} {vid_id} → {playlist_name} ({account_name})")
+
+        pipeline = RecordingPipeline.from_directory(directory)
+        report = pipeline.assign_playlists(
+            directory,
+            single_account=account,
+            dry_run=dry_run,
+            on_progress=on_progress,
+        )
+
+        if dry_run:
+            click.echo(f"Would assign: {report.assigned + report.failed} videos")
+            return
+
+        click.echo(f"Assigned: {report.assigned}")
+        click.echo(f"Failed: {report.failed}")
+        click.echo(f"Skipped: {report.skipped}")
+
+        if report.errors:
+            click.echo("\nErrors:")
+            for error in report.errors:
+                click.echo(f"  - {error}")
+
+    else:
+        from yt_recorder.adapters.raid import RaidAdapter
+        from yt_recorder.config import load_config
+
+        config = load_config()
+        raid = RaidAdapter(config.accounts, config.headless, config.delays)
+        raid.open()
+        try:
+            adapter = raid.get_adapter(config.accounts[0].name)
+            success = adapter.assign_playlist(video_id or "", name or "")
+            if success:
+                click.echo(f"✓ Assigned {video_id} to playlist '{name}'")
+            else:
+                click.echo(f"✗ Failed to assign {video_id} to playlist '{name}'")
+        finally:
+            raid.close()
+
+
 def _transcript_icon(status_value: str) -> str:
     icons: dict[str, str] = {
         "done": "📝",
