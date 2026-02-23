@@ -639,3 +639,172 @@ class TestCleanSynced:
         report = pipeline.clean_synced(tmp_path)
 
         assert report.deleted == 0
+
+
+class TestAssignPlaylists:
+    @pytest.fixture
+    def config(self) -> Config:
+        return Config(
+            accounts=[
+                YouTubeAccount("primary", Path("/tmp/p.json"), Path("/tmp/p.txt"), "primary"),
+                YouTubeAccount("mirror", Path("/tmp/m.json"), Path("/tmp/m.txt"), "mirror"),
+            ],
+            extensions=(".mp4",),
+            exclude_dirs=frozenset(),
+            max_depth=1,
+        )
+
+    @pytest.fixture
+    def mock_registry(self) -> Mock:
+        registry = Mock()
+        registry.load = Mock(return_value=[])
+        return registry
+
+    @pytest.fixture
+    def mock_raid(self) -> Mock:
+        raid = Mock()
+        raid.open = Mock()
+        raid.close = Mock()
+        adapter = Mock()
+        adapter.assign_playlist = Mock(return_value=True)
+        raid.get_adapter = Mock(return_value=adapter)
+        return raid
+
+    def _entry(
+        self,
+        file: str = "video.mp4",
+        playlist: str = "test-playlist",
+        account_ids: dict[str, str] | None = None,
+    ) -> RegistryEntry:
+        if account_ids is None:
+            account_ids = {"primary": "abc123", "mirror": "def456"}
+        return RegistryEntry(
+            file=file,
+            playlist=playlist,
+            uploaded_date=date.today(),
+            transcript_status=TranscriptStatus.PENDING,
+            account_ids=account_ids,
+        )
+
+    def test_assign_playlists_success(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """3 entries x 2 accounts = 6 assign_playlist calls."""
+        mock_registry.load.return_value = [
+            self._entry(file="v1.mp4", account_ids={"primary": "id1", "mirror": "id2"}),
+            self._entry(file="v2.mp4", account_ids={"primary": "id3", "mirror": "id4"}),
+            self._entry(file="v3.mp4", account_ids={"primary": "id5", "mirror": "id6"}),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path)
+
+        assert report.assigned == 6
+        assert report.failed == 0
+        assert report.skipped == 0
+        assert adapter.assign_playlist.call_count == 6
+        mock_raid.open.assert_called_once()
+        mock_raid.close.assert_called_once()
+
+    def test_assign_playlists_dry_run(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Dry run: no browser opened, no assign_playlist called."""
+        mock_registry.load.return_value = [
+            self._entry(file="v1.mp4"),
+            self._entry(file="v2.mp4"),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path, dry_run=True)
+
+        mock_raid.open.assert_not_called()
+        adapter.assign_playlist.assert_not_called()
+        assert report.assigned == 0
+        assert report.failed == 0
+        assert report.skipped == 0
+
+    def test_assign_playlists_skips_missing_video_id(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Entry with video_id='—' is skipped."""
+        mock_registry.load.return_value = [
+            self._entry(account_ids={"primary": "abc123", "mirror": "\u2014"}),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path)
+
+        assert report.assigned == 1
+        assert report.skipped == 1
+        assert adapter.assign_playlist.call_count == 1
+
+    def test_assign_playlists_skips_empty_playlist(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Entry with empty playlist is skipped."""
+        mock_registry.load.return_value = [
+            self._entry(playlist=""),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path)
+
+        assert report.skipped == 1
+        assert report.assigned == 0
+        adapter.assign_playlist.assert_not_called()
+
+    def test_assign_playlists_single_account(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Only specified account is processed."""
+        mock_registry.load.return_value = [
+            self._entry(account_ids={"primary": "abc123", "mirror": "def456"}),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path, single_account="primary")
+
+        assert report.assigned == 1
+        assert adapter.assign_playlist.call_count == 1
+        adapter.assign_playlist.assert_called_with("abc123", "test-playlist")
+
+    def test_assign_playlists_failure_counted(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Adapter returns False → report.failed incremented."""
+        mock_registry.load.return_value = [
+            self._entry(account_ids={"primary": "abc123"}),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+        adapter.assign_playlist.return_value = False
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path)
+
+        assert report.failed == 1
+        assert report.assigned == 0
+        assert len(report.errors) == 1
+
+    def test_assign_playlists_exception_handling(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        """Adapter raises exception → error captured in report.errors."""
+        mock_registry.load.return_value = [
+            self._entry(account_ids={"primary": "abc123"}),
+        ]
+        adapter = mock_raid.get_adapter.return_value
+        adapter.assign_playlist.side_effect = RuntimeError("Network error")
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.assign_playlists(tmp_path)
+
+        assert report.failed == 1
+        assert report.assigned == 0
+        assert len(report.errors) == 1
+        assert "Network error" in report.errors[0]

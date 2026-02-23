@@ -11,6 +11,7 @@ from yt_recorder.cli import main
 from yt_recorder.config import Config
 from yt_recorder.domain.models import (
     CleanReport,
+    PlaylistReport,
     RegistryEntry,
     SyncReport,
     TranscriptStatus,
@@ -287,3 +288,66 @@ class TestStatusCommand:
 
         assert result.exit_code == 0
         assert "not uploaded" in result.output
+
+
+class TestPlaylistCommand:
+    def test_playlist_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["playlist", "--help"])
+
+        assert result.exit_code == 0
+        assert "--video-id" in result.output
+        assert "--name" in result.output
+        assert "--dry-run" in result.output
+        assert "--account" in result.output
+
+    def test_playlist_dry_run(self, runner: CliRunner, tmp_path: Path) -> None:
+        with patch("yt_recorder.pipeline.RecordingPipeline.from_directory") as mock_from:
+            mock_pipeline = Mock()
+            mock_pipeline.assign_playlists.return_value = PlaylistReport(
+                assigned=5, failed=0, skipped=2
+            )
+            mock_from.return_value = mock_pipeline
+
+            result = runner.invoke(main, ["playlist", str(tmp_path), "--dry-run"])
+
+            assert result.exit_code == 0
+            assert "Would assign" in result.output
+
+    def test_playlist_single_video(self, runner: CliRunner) -> None:
+        with (
+            patch("yt_recorder.config.load_config") as mock_load_config,
+            patch("yt_recorder.adapters.raid.RaidAdapter") as mock_raid_cls,
+        ):
+            mock_load_config.return_value = Config(
+                accounts=[
+                    YouTubeAccount("primary", Path("/tmp/p.json"), Path("/tmp/p.txt"), "primary"),
+                ],
+            )
+            mock_raid = Mock()
+            mock_adapter = Mock()
+            mock_adapter.assign_playlist.return_value = True
+            mock_raid.get_adapter.return_value = mock_adapter
+            mock_raid_cls.return_value = mock_raid
+
+            result = runner.invoke(
+                main, ["playlist", "--video-id", "abc123", "--name", "my-list"]
+            )
+
+            assert result.exit_code == 0
+            assert "\u2713" in result.output
+            mock_adapter.assign_playlist.assert_called_once_with("abc123", "my-list")
+
+    def test_playlist_mutual_exclusivity(self, runner: CliRunner, tmp_path: Path) -> None:
+        result = runner.invoke(
+            main,
+            ["playlist", str(tmp_path), "--video-id", "abc123", "--name", "my-list"],
+        )
+
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
+    def test_playlist_missing_name(self, runner: CliRunner) -> None:
+        result = runner.invoke(main, ["playlist", "--video-id", "abc123"])
+
+        assert result.exit_code == 1
+        assert "--name required" in result.output
