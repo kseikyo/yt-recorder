@@ -329,9 +329,7 @@ class TestPlaylistCommand:
             mock_raid.get_adapter.return_value = mock_adapter
             mock_raid_cls.return_value = mock_raid
 
-            result = runner.invoke(
-                main, ["playlist", "--video-id", "abc123", "--name", "my-list"]
-            )
+            result = runner.invoke(main, ["playlist", "--video-id", "abc123", "--name", "my-list"])
 
             assert result.exit_code == 0
             assert "\u2713" in result.output
