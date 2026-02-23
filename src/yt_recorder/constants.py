@@ -33,7 +33,7 @@ UPLOAD_TIMEOUT_SECONDS = 30 * 60
 PLAYLIST_TRIGGER = (
     'ytcp-video-metadata-playlists ytcp-dropdown-trigger[aria-label="Select playlists"]'
 )
-PLAYLIST_SEARCH_INPUT = "ytcp-playlist-dialog #search-input"
+PLAYLIST_SEARCH_INPUT = "ytcp-playlist-dialog input#search-input"
 PLAYLIST_ITEM_TEMPLATE = '#items tp-yt-paper-checkbox:has-text("{name}")'
 PLAYLIST_DONE = "ytcp-button.done-button"
 PLAYLIST_PAGE_SAVE = "ytcp-button#save"
