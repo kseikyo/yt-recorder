@@ -230,7 +230,20 @@ class TestUpload:
         mock_video_url_elem.get_attribute.return_value = "https://youtu.be/abc123"
 
         def query_selector_side_effect(selector: str) -> Mock | None:
-            if selector == "#title-textarea #textbox":
+            if selector == "iframe[src*='recaptcha'], div#captcha-container":
+                return None
+            elif selector == "#title-textarea #textbox":
+                return mock_title_input
+            elif selector == "#done-button":
+                return mock_done_btn
+            return None
+
+        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
+            if selector == "ytcp-uploads-file-picker":
+                return Mock()
+            elif selector == 'input[type="file"]':
+                return mock_file_input
+            elif selector == "#title-textarea #textbox":
                 return mock_title_input
             elif selector == 'tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]':
                 return mock_not_for_kids
@@ -240,21 +253,13 @@ class TestUpload:
                 return mock_private_radio
             elif selector == "span.video-url-fadeable a":
                 return mock_video_url_elem
-            elif selector == "#done-button":
-                return mock_done_btn
-            elif selector == "iframe[src*='recaptcha'], div#captcha-container":
+            elif selector == "tp-yt-iron-overlay-backdrop":
                 return None
-            return None
-
-        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
-            if selector == "ytcp-uploads-file-picker":
-                return Mock()
-            elif selector == 'input[type="file"]':
-                return mock_file_input
             return None
 
         mock_page.query_selector.side_effect = query_selector_side_effect
         mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
+        mock_page.wait_for_function.return_value = None
         mock_context.new_page.return_value = mock_page
 
         adapter.context = mock_context
@@ -290,29 +295,48 @@ class TestAssignPlaylist:
         mock_page = Mock()
         mock_page.url = "https://studio.youtube.com/video/abc123/edit"
 
-        mock_playlist_dropdown = Mock()
-        mock_playlist_option = Mock()
-        mock_save_btn = Mock()
+        mock_playlist_trigger = Mock()
+        mock_search_input = Mock()
+        mock_playlist_item = Mock()
+        mock_done_btn = Mock()
+        mock_page_save_btn = Mock()
 
-        def query_selector_side_effect(selector: str) -> Mock | None:
-            if "Playlist" in selector:
-                return mock_playlist_dropdown
-            elif "my-playlist" in selector:
-                return mock_playlist_option
-            elif "Save" in selector:
-                return mock_save_btn
+        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
+            if (
+                selector
+                == 'ytcp-video-metadata-playlists ytcp-dropdown-trigger[aria-label="Select playlists"]'
+            ):
+                return mock_playlist_trigger
+            elif selector == "ytcp-playlist-dialog #search-input":
+                return mock_search_input
+            elif selector == '#items tp-yt-paper-checkbox:has-text("my-playlist")':
+                return mock_playlist_item
+            elif selector == "ytcp-button.done-button":
+                return mock_done_btn
+            elif selector == "ytcp-button#save":
+                return mock_page_save_btn
             elif selector == "iframe[src*='recaptcha'], div#captcha-container":
                 return None
             return None
 
+        def query_selector_side_effect(selector: str) -> Mock | None:
+            if selector == "iframe[src*='recaptcha'], div#captcha-container":
+                return None
+            return None
+
+        mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
         mock_page.query_selector.side_effect = query_selector_side_effect
+        mock_page.wait_for_function.return_value = None
         mock_context.new_page.return_value = mock_page
 
         adapter.context = mock_context
 
-        adapter.assign_playlist("abc123", "my-playlist")
+        result = adapter.assign_playlist("abc123", "my-playlist")
 
+        assert result is True
         mock_page.goto.assert_called_once()
-        mock_playlist_dropdown.click.assert_called_once()
-        mock_playlist_option.click.assert_called_once()
-        mock_save_btn.click.assert_called_once()
+        mock_playlist_trigger.click.assert_called_once()
+        mock_search_input.fill.assert_called_once_with("my-playlist")
+        mock_playlist_item.click.assert_called_once()
+        mock_done_btn.click.assert_called_once()
+        mock_page_save_btn.click.assert_called_once()
