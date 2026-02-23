@@ -14,8 +14,8 @@ NEXT_BUTTON = "#next-button"
 PRIVATE_RADIO = 'tp-yt-paper-radio-button[name="PRIVATE"]'
 DONE_BUTTON = "#done-button"
 
-# Dialog scrim overlay
-DIALOG_SCRIM = "tp-yt-iron-overlay-backdrop"
+# Dialog scrim overlay (exclude nav-backdrop which is always visible)
+DIALOG_SCRIM = "tp-yt-iron-overlay-backdrop:not(#nav-backdrop)"
 
 # Video URL extraction
 VIDEO_URL_ELEMENT = "span.video-url-fadeable a"

@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import (
@@ -206,7 +207,7 @@ class TestUpload:
             return None
 
         mock_page.query_selector.side_effect = query_selector_side_effect
-        mock_page.wait_for_selector.side_effect = TimeoutError("Selector not found")
+        mock_page.wait_for_selector.side_effect = PlaywrightTimeoutError("Selector not found")
         mock_context.new_page.return_value = mock_page
 
         adapter.context = mock_context

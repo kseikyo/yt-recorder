@@ -1,0 +1,132 @@
+{
+  "filePicker": {
+    "found": true,
+    "tagName": "YTCP-UPLOADS-FILE-PICKER",
+    "id": "ytcp-uploads-dialog-file-picker",
+    "classes": "style-scope ytcp-uploads-dialog"
+  },
+  "fileInput": {
+    "found": true,
+    "parentTag": "DIV",
+    "parentId": "content",
+    "accept": null
+  },
+  "titleInput": {
+    "#title-textarea_#textbox": false,
+    "#title-textarea": false,
+    "ytcp-social-suggestions-textbox_#textbox": false,
+    "aria-label_contenteditable": false,
+    "#textbox_aria-title": false,
+    "tagOfTitleTextarea": null,
+    "titleTextareaInnerHTML": null
+  },
+  "notForKids": {
+    "tp-yt-paper-radio-button": false,
+    "any[name=NOT_MFK]": false,
+    "matchTag": null,
+    "matchId": null
+  },
+  "nextButton": {
+    "found": true,
+    "tagName": "YTCP-BUTTON",
+    "ariaLabel": null,
+    "ariaDisabled": "false",
+    "innerText": "Next"
+  },
+  "doneButton": {
+    "found": true,
+    "tagName": "YTCP-BUTTON",
+    "ariaLabel": null,
+    "ariaDisabled": "true"
+  },
+  "privateRadio": {
+    "tp-yt-paper-radio-button": false,
+    "any[name=PRIVATE]": false,
+    "matchTag": null,
+    "matchId": null
+  },
+  "unlistedRadio": {
+    "any[name=UNLISTED]": false,
+    "matchTag": null
+  },
+  "publicRadio": {
+    "any[name=PUBLIC]": false,
+    "matchTag": null
+  },
+  "videoUrl": {
+    "span.video-url-fadeable_a": false,
+    ".video-url-fadeable_a": false
+  },
+  "dialogScrim": {
+    "tp-yt-iron-overlay-backdrop": true,
+    ".tp-yt-iron-overlay-backdrop": false,
+    "class*=backdrop": true,
+    "backdropTag": "BUTTON",
+    "ytcp-uploads-dialog": true
+  },
+  "uploadProgress": {
+    "found": true,
+    "tagName": "YTCP-VIDEO-UPLOAD-PROGRESS"
+  },
+  "wizardSteps": {
+    "stepBadges": [],
+    "stepIds": [],
+    "stepCount": 0
+  },
+  "customElementCounts": {
+    "dom-if": 332,
+    "ytcp-animatable": 102,
+    "ps-dom-if": 43,
+    "ytcp-tooltip": 29,
+    "yt-icon": 27,
+    "iron-iconset-svg": 26,
+    "ytcp-ve": 23,
+    "ps-dom-repeat": 21,
+    "ytcp-button": 20,
+    "ytcp-button-shape": 20,
+    "yt-touch-feedback-shape": 19,
+    "yt-formatted-string": 16,
+    "tp-yt-paper-icon-item": 11,
+    "tp-yt-paper-tab": 9,
+    "ytcp-paper-tooltip": 8,
+    "ytcp-paper-tooltip-placeholder": 8,
+    "dom-repeat": 7,
+    "ytcp-icon-button": 7,
+    "ytcp-paper-tooltip-body": 7,
+    "ytcp-help": 5,
+    "custom-style": 4,
+    "tp-yt-paper-dialog": 3,
+    "tp-yt-paper-progress": 3,
+    "tp-yt-iron-overlay-backdrop": 3,
+    "ytcp-banner": 3,
+    "ytcp-text-dropdown-trigger": 3,
+    "ytcp-dropdown-trigger": 3,
+    "iron-a11y-keys": 3,
+    "tp-yt-paper-ripple": 3,
+    "ytcp-error-section": 3,
+    "ytcp-top-banner": 2,
+    "ytcp-feature-discovery-tour-step": 2,
+    "ytcp-send-feedback-button": 2,
+    "ytcp-select": 2,
+    "yt-attributed-string": 2,
+    "ytcp-app": 1,
+    "ytcp-legacy-dialog-manager": 1,
+    "ytcp-dialog-host": 1,
+    "ytcp-dialog-manager": 1,
+    "ytcp-nitrate": 1,
+    "ytcp-toast-manager": 1,
+    "tp-yt-paper-toast": 1,
+    "ytsp-sponsors-only-video-post-manager": 1,
+    "ytcp-permanent-operational-error-manager": 1,
+    "ytcp-dialog": 1,
+    "ytcp-a11y-announcer": 1,
+    "ytcp-entity-page": 1,
+    "ytcp-warm-welcome": 1,
+    "ytcp-header": 1,
+    "ytcp-home-button": 1
+  },
+  "migrationStats": {
+    "tpYtCount": 36,
+    "ytcpCount": 293
+  }
+}

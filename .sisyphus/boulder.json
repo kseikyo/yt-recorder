@@ -1,13 +1,12 @@
 {
-  "active_plan": "/Users/lucassierota/Desktop/recordings/yt-recorder/.sisyphus/plans/v0.2-finish-and-ship.md",
-  "started_at": "2026-02-22T22:55:03.404Z",
-  "completed_at": "2026-02-22T23:21:00.000Z",
-  "session_ids": ["ses_378839912ffed7CLQm1tKMqH4e"],
-  "plan_name": "v0.2-finish-and-ship",
+  "active_plan": "/Users/lucassierota/Desktop/recordings/yt-recorder/.sisyphus/plans/youtube-selector-fix.md",
+  "started_at": "2026-02-23T03:10:42.218Z",
+  "session_ids": ["ses_37785b3f2ffeIGuaPiimWtWMf3"],
+  "plan_name": "youtube-selector-fix",
   "progress": {
-    "completed": ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2"],
+    "completed": ["1", "2", "3", "4"],
     "in_progress": [],
-    "remaining": []
+    "remaining": ["5"]
   },
-  "status": "complete"
+  "status": "active"
 }

@@ -1,0 +1,80 @@
+{
+  "radio_PRIVATE": {
+    "oldSelector": false,
+    "anySelector": false,
+    "tag": null,
+    "id": null,
+    "classes": null
+  },
+  "radio_UNLISTED": {
+    "oldSelector": false,
+    "anySelector": false,
+    "tag": null,
+    "id": null,
+    "classes": null
+  },
+  "radio_PUBLIC": {
+    "oldSelector": false,
+    "anySelector": false,
+    "tag": null,
+    "id": null,
+    "classes": null
+  },
+  "playlistTrigger": {
+    "tp-yt-paper-button[aria-label*=Playlist]": false,
+    "ytcp-video-metadata-playlists": true,
+    "[aria-label*=playlist]": true,
+    "[aria-label*=Playlist]": false,
+    "ytcp-text-dropdown-trigger[playlist]": false,
+    "ytcp-dropdown-trigger[playlist]": true,
+    "foundTag": "A",
+    "foundId": "",
+    "ariaLabel": "Learn more about playlists",
+    "cssPath": "ytcp-app > ytcp-entity-page#entity-page > div#main-container > div > main#main > div > ytcp-animatable > ytcp-video-details-section#edit > ytcp-video-metadata-editor#video-metadata-editor > div > ytcp-video-metadata-editor-basics#basics > div > div > a"
+  },
+  "pageSave": {
+    "found": true,
+    "tag": "YTCP-BUTTON",
+    "id": "save",
+    "ariaLabel": null,
+    "ariaDisabled": "true",
+    "text": "Save"
+  },
+  "videoUrl": {
+    "found": true,
+    "href": "https://youtu.be/O0O330BMtgM",
+    "tag": "A"
+  },
+  "customTags": {
+    "ytcp-animatable": 97,
+    "ytcp-tooltip": 37,
+    "ytcp-icon-button": 19,
+    "ytcp-ve": 19,
+    "ytcp-button": 16,
+    "ytcp-button-shape": 16,
+    "ytcp-paper-tooltip": 13,
+    "ytcp-paper-tooltip-placeholder": 13,
+    "tp-yt-paper-icon-item": 10,
+    "ytcp-form-error-tip": 6,
+    "ytcp-img-with-fallback": 5,
+    "ytcp-paper-tooltip-body": 5,
+    "tp-yt-paper-dialog": 4,
+    "tp-yt-paper-progress": 4,
+    "ytcp-anchor": 4,
+    "ytcp-badge": 4,
+    "ytcp-text-dropdown-trigger": 4,
+    "ytcp-dropdown-trigger": 4,
+    "tp-yt-paper-ripple": 4,
+    "tp-yt-paper-radio-button": 4,
+    "ytcp-banner": 3,
+    "ytcp-feature-discovery-tour-step": 3,
+    "ytcp-thumbnail-editor": 3,
+    "ytcp-dialog": 2,
+    "tp-yt-iron-overlay-backdrop": 2,
+    "ytcp-top-banner": 2,
+    "ytcp-text-menu": 2,
+    "tp-yt-paper-listbox": 2,
+    "ytcp-social-suggestions-textbox": 2,
+    "ytcp-form-input-container": 2
+  }
+}

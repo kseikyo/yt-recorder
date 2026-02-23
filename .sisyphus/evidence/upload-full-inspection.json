@@ -1,0 +1,104 @@
+{
+  "steps": {
+    "step1": {
+      "step": "step1-details",
+      "titleOld": true,
+      "titleTextarea": true,
+      "titleTag": "DIV",
+      "titleId": "textbox",
+      "titleAriaLabel": "Add a title that describes your video (type @ to mention a channel)",
+      "titleContentEditable": "true",
+      "notForKidsOld": true,
+      "notForKidsAny": true,
+      "nfkTag": "TP-YT-PAPER-RADIO-BUTTON",
+      "nextButton": true,
+      "nextTag": "YTCP-BUTTON",
+      "nextDisabled": "false",
+      "nextVisible": true,
+      "nextRect": {
+        "x": 1034.859375,
+        "y": 620,
+        "w": 61.140625,
+        "h": 36
+      },
+      "doneButton": true,
+      "doneTag": "YTCP-BUTTON",
+      "doneDisabled": "true",
+      "doneText": "Save",
+      "radio_PRIVATE": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "radio_UNLISTED": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "radio_PUBLIC": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "videoUrl": {
+        "found": true,
+        "href": ""
+      },
+      "dialogScrim": {
+        "found": true,
+        "tag": "TP-YT-IRON-OVERLAY-BACKDROP"
+      }
+    },
+    "step2": {
+      "step": "step2",
+      "titleOld": false,
+      "titleTextarea": false,
+      "notForKidsOld": false,
+      "notForKidsAny": false,
+      "nextButton": true,
+      "nextTag": "YTCP-BUTTON",
+      "nextDisabled": "false",
+      "nextVisible": false,
+      "nextRect": {
+        "x": 0,
+        "y": 0,
+        "w": 0,
+        "h": 0
+      },
+      "doneButton": true,
+      "doneTag": "YTCP-BUTTON",
+      "doneDisabled": "true",
+      "doneText": "Save",
+      "radio_PRIVATE": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "radio_UNLISTED": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "radio_PUBLIC": {
+        "oldSelector": false,
+        "anySelector": false,
+        "tag": null,
+        "id": null
+      },
+      "videoUrl": {
+        "found": false
+      },
+      "dialogScrim": {
+        "found": true,
+        "tag": "TP-YT-IRON-OVERLAY-BACKDROP"
+      }
+    }
+  },
+  "total_steps": 2,
+  "video_url_candidates": []
+}

@@ -6,7 +6,16 @@ import random
 import time
 from pathlib import Path
 
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    sync_playwright,
+)
+from playwright.sync_api import (
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from yt_recorder import constants
 from yt_recorder.domain.exceptions import (
@@ -54,7 +63,7 @@ class YouTubeBrowserAdapter:
     def _wait_for_scrim_dismissed(self, page: Page, timeout: int = 10000) -> None:
         try:
             page.wait_for_selector(constants.DIALOG_SCRIM, state="hidden", timeout=timeout)
-        except TimeoutError:
+        except PlaywrightTimeoutError:
             pass
 
     def open(self) -> None:
@@ -93,7 +102,7 @@ class YouTubeBrowserAdapter:
                 file_input = page.wait_for_selector(
                     constants.FILE_INPUT, state="attached", timeout=5000
                 )
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("File input selector not found") from e
             if not file_input:
                 raise SelectorChangedError("File input selector not found")
@@ -152,7 +161,7 @@ class YouTubeBrowserAdapter:
                     }""",
                     timeout=constants.UPLOAD_TIMEOUT_SECONDS * 1000,
                 )
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise UploadTimeoutError(
                     f"Upload exceeded {constants.UPLOAD_TIMEOUT_SECONDS}s timeout"
                 ) from e
@@ -167,7 +176,7 @@ class YouTubeBrowserAdapter:
             # Wait for upload dialog to close after publishing
             try:
                 page.wait_for_selector("ytcp-uploads-dialog", state="hidden", timeout=60000)
-            except TimeoutError:
+            except PlaywrightTimeoutError:
                 logger.warning("Upload dialog did not close, but video was published")
 
             return UploadResult(
@@ -198,7 +207,7 @@ class YouTubeBrowserAdapter:
             # Wait for page to fully load, click playlist trigger
             try:
                 trigger = page.wait_for_selector(constants.PLAYLIST_TRIGGER, timeout=15000)
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Playlist trigger not found") from e
             if not trigger:
                 raise SelectorChangedError("Playlist trigger not found")
@@ -208,7 +217,7 @@ class YouTubeBrowserAdapter:
             # Wait for playlist dialog to open
             try:
                 search_input = page.wait_for_selector(constants.PLAYLIST_SEARCH_INPUT, timeout=5000)
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Playlist dialog did not open") from e
             if not search_input:
                 raise SelectorChangedError("Playlist search input not found")
@@ -221,7 +230,7 @@ class YouTubeBrowserAdapter:
             item_selector = constants.PLAYLIST_ITEM_TEMPLATE.format(name=playlist_name)
             try:
                 playlist_item = page.wait_for_selector(item_selector, timeout=5000)
-            except TimeoutError:
+            except PlaywrightTimeoutError:
                 logger.warning(
                     "Playlist '%s' not found for video %s",
                     playlist_name,
@@ -241,7 +250,7 @@ class YouTubeBrowserAdapter:
             # Click done to close playlist dialog
             try:
                 done_btn = page.wait_for_selector(constants.PLAYLIST_DONE, timeout=5000)
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Playlist done button not found") from e
             if not done_btn:
                 raise SelectorChangedError("Playlist done button not found")
@@ -251,7 +260,7 @@ class YouTubeBrowserAdapter:
             # Page-level save (required after dialog closes)
             try:
                 save_btn = page.wait_for_selector(constants.PLAYLIST_PAGE_SAVE, timeout=5000)
-            except TimeoutError as e:
+            except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Page save button not found") from e
             if not save_btn:
                 raise SelectorChangedError("Page save button not found")

@@ -1,0 +1,31 @@
+{
+  "dialogContainer": {
+    "found": false,
+    "tag": null,
+    "id": null,
+    "classes": null
+  },
+  "searchInput": {
+    "found": true,
+    "tag": "INPUT",
+    "id": "query-input",
+    "placeholder": "Search across your channel",
+    "ariaLabel": null,
+    "cssPath": "ytcp-app > ytcp-entity-page#entity-page > div#main-container > ytcp-header > header > ytcp-omnisearch > div#search-layer > ytcp-ve > form > input#query-input"
+  },
+  "itemsContainer": {
+    "found": false,
+    "tag": null,
+    "id": null
+  },
+  "playlistItems": [],
+  "playlistItemCount": 0,
+  "playlistSave": {
+    "found": false,
+    "tag": null,
+    "id": null,
+    "classes": null,
+    "ariaLabel": null,
+    "text": null
+  }
+}

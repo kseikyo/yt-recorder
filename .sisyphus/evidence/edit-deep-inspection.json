@@ -1,0 +1,248 @@
+{
+  "playlist_structure": {
+    "sectionTag": "YTCP-VIDEO-METADATA-PLAYLISTS",
+    "sectionId": "",
+    "interactableElements": [
+      {
+        "tag": "YTCP-TEXT-DROPDOWN-TRIGGER",
+        "id": null,
+        "role": null,
+        "ariaLabel": null,
+        "text": "Select",
+        "classes": "dropdown style-scope ytcp-video-metadata-playlists",
+        "href": null,
+        "rect": {
+          "w": 312,
+          "h": 48
+        }
+      },
+      {
+        "tag": "YTCP-DROPDOWN-TRIGGER",
+        "id": "",
+        "role": "button",
+        "ariaLabel": "Select playlists",
+        "text": "Select",
+        "classes": "use-placeholder style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger",
+        "href": null,
+        "rect": {
+          "w": 312,
+          "h": 48
+        }
+      },
+      {
+        "tag": "DIV",
+        "id": "",
+        "role": "button",
+        "ariaLabel": null,
+        "text": "Select",
+        "classes": " container style-scope ytcp-dropdown-trigger style-scope ytcp-dropdown-trigger",
+        "href": null,
+        "rect": {
+          "w": 312,
+          "h": 48
+        }
+      }
+    ]
+  },
+  "playlist_html": "<ytcp-video-metadata-playlists class=\"style-scope ytcp-video-metadata-editor-basics\" aria-label=\"Add to playlist\"><!--css-build:shady--><!--css_build_scope:ytcp-video-metadata-playlists--><ytcp-text-dropdown-trigger class=\"dropdown style-scope ytcp-video-metadata-playlists\" icon=\"yt-studio-system-icons:chevron_down\" placeholder=\"Select\" track-click=\"true\"><!--css-build:shady--><!--css_build_scope:ytcp-text-dropdown-trigger--><ytcp-dropdown-trigger role=\"button\" class=\"use-placeholder style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger\" aria-label=\"Select playlists\" tabindex=\"0\"><!--css-build:shady--><!--css_build_scope:ytcp-dropdown-trigger--><iron-a11y-keys keys=\"enter\" class=\"style-scope ytcp-dropdown-trigger\"></iron-a11y-keys>\n\n<div role=\"button\" class=\" container style-scope ytcp-dropdown-trigger style-scope ytcp-dropdown-trigger\">\n  <ps-dom-if restamp=\"\" class=\"style-scope ytcp-dropdown-trigger\"><template is=\"dom-if\"></template></ps-dom-if>\n  <div class=\"color-marker style-scope ytcp-dropdown-trigger\">\n    <div class=\"color-marker-inner style-scope ytcp-dropdown-trigger\" style=\"\"></div>\n  </div>\n  <ps-dom-if restamp=\"\" class=\"style-scope ytcp-dropdown-trigger\"><template is=\"dom-if\"></template></ps-dom-if>\n  <div class=\"left-container style-scope ytcp-dropdown-trigger\">\n    <ps-dom-if restamp=\"\" class=\"style-scope ytcp-dropdown-trigger\"><template is=\"dom-if\"></template></ps-dom-if>\n    <span class=\"dropdown-trigger-text style-scope ytcp-text-dropdown-trigger\">\n    Select\n  </span>\n  </div>\n  \n    <div class=\"right-container style-scope ytcp-dropdown-trigger\">\n      <ps-dom-if class=\"style-scope ytcp-dropdown-trigger\"><template is=\"dom-if\"></template></ps-dom-if>\n      \n        <yt-icon id=\"right-icon\" class=\"right-icon style-scope ytcp-dropdown-trigger\"><!--css-build:shady--><!--css_build_scope:yt-icon--><!--css_build_styles:video.youtube.src.web.polymer.shared.ui.styles.yt_base_styles.yt.base.styles.css.js,video.youtube.src.web.polymer",
+  "visibility_radios": {
+    "radioButtons": [
+      {
+        "name": "VIDEO_MADE_FOR_KIDS_MFK",
+        "ariaLabel": null,
+        "checked": false,
+        "ariaChecked": "false",
+        "text": "Yes, it's made for kids\n.\nFeatures like personalized ads and notifications won\u2019t",
+        "classes": "style-scope ytkc-made-for-kids-select",
+        "visible": true,
+        "parentId": "",
+        "parentTag": "TP-YT-PAPER-RADIO-GROUP"
+      },
+      {
+        "name": "VIDEO_MADE_FOR_KIDS_NOT_MFK",
+        "ariaLabel": null,
+        "checked": true,
+        "ariaChecked": "true",
+        "text": "No, it's not made for kids",
+        "classes": "style-scope ytkc-made-for-kids-select iron-selected",
+        "visible": true,
+        "parentId": "",
+        "parentTag": "TP-YT-PAPER-RADIO-GROUP"
+      },
+      {
+        "name": "VIDEO_AGE_RESTRICTION_SELF",
+        "ariaLabel": null,
+        "checked": false,
+        "ariaChecked": "false",
+        "text": "Yes, restrict my video to viewers over 18",
+        "classes": "style-scope ytcp-age-restriction-select",
+        "visible": false,
+        "parentId": "age-restriction-group",
+        "parentTag": "TP-YT-PAPER-RADIO-GROUP"
+      },
+      {
+        "name": "VIDEO_AGE_RESTRICTION_NONE",
+        "ariaLabel": null,
+        "checked": true,
+        "ariaChecked": "true",
+        "text": "No, don't restrict my video to viewers over 18 only",
+        "classes": "style-scope ytcp-age-restriction-select iron-selected",
+        "visible": false,
+        "parentId": "age-restriction-group",
+        "parentTag": "TP-YT-PAPER-RADIO-GROUP"
+      }
+    ],
+    "allDropdownTriggers": [
+      {
+        "tag": "YTCP-DROPDOWN-TRIGGER",
+        "id": "",
+        "ariaLabel": "Select playlists",
+        "text": "Select",
+        "classes": "use-placeholder style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger",
+        "visible": true
+      },
+      {
+        "tag": "YTCP-DROPDOWN-TRIGGER",
+        "id": "",
+        "ariaLabel": null,
+        "text": "Subtitles",
+        "classes": " style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger",
+        "visible": true
+      },
+      {
+        "tag": "YTCP-DROPDOWN-TRIGGER",
+        "id": "",
+        "ariaLabel": null,
+        "text": "End screen",
+        "classes": " style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger",
+        "visible": true
+      },
+      {
+        "tag": "YTCP-DROPDOWN-TRIGGER",
+        "id": "",
+        "ariaLabel": null,
+        "text": "Cards",
+        "classes": " style-scope ytcp-text-dropdown-trigger style-scope ytcp-text-dropdown-trigger",
+        "visible": true
+      }
+    ],
+    "visibilityComponent": {
+      "found": true,
+      "tag": "YTCP-VIDEO-METADATA-VISIBILITY",
+      "id": ""
+    },
+    "visibilityInteractable": [
+      {
+        "tag": "YTCP-ICON-BUTTON",
+        "id": "select-button",
+        "role": "button",
+        "ariaLabel": "Edit video visibility status",
+        "text": ""
+      }
+    ]
+  },
+  "playlist_click": {
+    "clicked": true,
+    "tag": "YTCP-TEXT-DROPDOWN-TRIGGER",
+    "id": null,
+    "text": "Select"
+  },
+  "dialog_content": {
+    "visibleDialogs": [
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "classes": "style-scope ytcp-playlist-dialog",
+        "ariaLabel": "Choose playlists",
+        "innerText": "No playlists available\nCreate playlist\nDone"
+      }
+    ],
+    "visibleCheckboxes": [],
+    "checkboxCount": 0,
+    "searchInputs": [
+      {
+        "tag": "INPUT",
+        "id": "query-input",
+        "placeholder": "Search across your channel",
+        "visible": true,
+        "parentTag": "FORM",
+        "parentId": ""
+      },
+      {
+        "tag": "YTCP-SEARCH-BAR",
+        "id": "search-input",
+        "placeholder": "Search for a playlist",
+        "visible": false,
+        "parentTag": "DIV",
+        "parentId": "search"
+      },
+      {
+        "tag": "INPUT",
+        "id": "search-input",
+        "placeholder": "Search for a playlist",
+        "visible": false,
+        "parentTag": "YTCP-SEARCH-BAR",
+        "parentId": "search-input"
+      }
+    ],
+    "dialogButtons": [
+      {
+        "tag": "YTCP-BUTTON",
+        "id": "",
+        "text": "Close",
+        "classes": "style-scope ytcp-permanent-operational-error-manager",
+        "ariaLabel": null
+      }
+    ],
+    "allPaperDialogs": [
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": false,
+        "opened": false,
+        "classes": " style-scope ytcp-dialog style-scope ytcp-dialog",
+        "innerText": "Close"
+      },
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": false,
+        "opened": false,
+        "classes": "style-scope ytcp-text-menu",
+        "innerText": ""
+      },
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": false,
+        "opened": false,
+        "classes": " style-scope ytcp-dialog style-scope ytcp-dialog",
+        "innerText": "Sync status\n  \n  \n\n\n  \n    \n      \n      \n        \n        \n          \n            Video field\n          \n          \n        \n        \n          \n          \n        \n        \n      \n    \n  \n    \n      \n      \n        \n        \n          \n            Status\n          \n          \n        \n        \n   "
+      },
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": false,
+        "opened": false,
+        "classes": "style-scope ytcp-text-menu",
+        "innerText": ""
+      },
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": true,
+        "opened": false,
+        "classes": "style-scope ytcp-playlist-dialog",
+        "innerText": "No playlists available\nCreate playlist\nDone"
+      },
+      {
+        "tag": "TP-YT-PAPER-DIALOG",
+        "id": "dialog",
+        "visible": false,
+        "opened": false,
+        "classes": "style-scope ytcp-text-menu",
+        "innerText": ""
+      }
+    ]
+  }
+}

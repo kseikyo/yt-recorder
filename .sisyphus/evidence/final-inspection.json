@@ -1,0 +1,43 @@
+{
+  "headful": {
+    "filePicker": false,
+    "fileInput": true,
+    "titleInput": true,
+    "notForKids": true,
+    "nextButton": false,
+    "doneButton": false,
+    "dialogScrim": true,
+    "videoUrl": true,
+    "playlistSection": true,
+    "playlistDropdown": true,
+    "visibilityComponent": true,
+    "visibilityEditBtn": true,
+    "pageSave": true
+  },
+  "headless": {
+    "filePicker": false,
+    "fileInput": false,
+    "titleInput": false,
+    "notForKids": false,
+    "nextButton": false,
+    "doneButton": false,
+    "dialogScrim": false,
+    "videoUrl": false,
+    "playlistSection": false,
+    "playlistDropdown": false,
+    "visibilityComponent": false,
+    "visibilityEditBtn": false,
+    "pageSave": false
+  },
+  "playlist_dialog": {
+    "dialogFound": true,
+    "dialogSelector": "tp-yt-paper-dialog.ytcp-playlist-dialog"
+  },
+  "page_save_state": {
+    "found": true,
+    "tag": "YTCP-BUTTON",
+    "id": "save",
+    "disabled": "true",
+    "text": "Save"
+  }
+}
