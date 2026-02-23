@@ -19,6 +19,7 @@ from yt_recorder.domain.exceptions import (
 from yt_recorder.domain.formatters import format_transcript_md, parse_srt, title_from_filename
 from yt_recorder.domain.models import (
     CleanReport,
+    PlaylistReport,
     RegistryEntry,
     SyncReport,
     TranscriptStatus,
@@ -207,6 +208,99 @@ class RecordingPipeline:
             delete_failed=delete_failed,
             playlist_failed=playlist_failed,
             total_registered=len(entries) + uploaded,
+            errors=errors,
+        )
+
+    def assign_playlists(
+        self,
+        directory: Path,
+        single_account: str | None = None,
+        dry_run: bool = False,
+        on_progress: Callable[[str, str, str, bool], None] | None = None,
+    ) -> PlaylistReport:
+        """Assign playlists to uploaded videos.
+
+        Args:
+            directory: Recordings directory
+            single_account: Filter to single account only
+            dry_run: Show plan without executing
+            on_progress: Callback(account, video_id, playlist, success)
+
+        Returns:
+            PlaylistReport with assignment counts and errors
+        """
+        assigned = 0
+        failed = 0
+        skipped = 0
+        errors: list[str] = []
+
+        try:
+            entries = self.registry.load()
+        except RegistryFileNotFoundError:
+            entries = []
+
+        if dry_run:
+            for entry in entries:
+                if not entry.playlist or not entry.account_ids:
+                    skipped += 1
+                    continue
+                for account_name, video_id in entry.account_ids.items():
+                    if video_id == "—":
+                        skipped += 1
+                        continue
+                    if single_account and account_name != single_account:
+                        continue
+                    if on_progress:
+                        on_progress(account_name, video_id, entry.playlist, False)
+            return PlaylistReport(assigned=0, failed=0, skipped=skipped, errors=errors)
+
+        self.raid.open()
+
+        try:
+            for entry in entries:
+                if not entry.playlist or not entry.account_ids:
+                    skipped += 1
+                    continue
+
+                for account_name, video_id in entry.account_ids.items():
+                    if video_id == "—":
+                        skipped += 1
+                        continue
+
+                    if single_account and account_name != single_account:
+                        continue
+
+                    try:
+                        adapter = self.raid.get_adapter(account_name)
+                        success = adapter.assign_playlist(video_id, entry.playlist)
+
+                        if success:
+                            assigned += 1
+                        else:
+                            failed += 1
+                            errors.append(
+                                f"Failed to assign {entry.playlist} to {video_id} on {account_name}"
+                            )
+
+                        if on_progress:
+                            on_progress(account_name, video_id, entry.playlist, success)
+
+                    except Exception as e:
+                        failed += 1
+                        errors.append(
+                            f"Error assigning {entry.playlist} to {video_id} on {account_name}: {e}"
+                        )
+                        logger.exception(
+                            "Playlist assignment failed for %s on %s", video_id, account_name
+                        )
+
+        finally:
+            self.raid.close()
+
+        return PlaylistReport(
+            assigned=assigned,
+            failed=failed,
+            skipped=skipped,
             errors=errors,
         )
 

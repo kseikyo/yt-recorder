@@ -124,6 +124,16 @@ class CleanReport:
 
 
 @dataclass(frozen=True)
+class PlaylistReport:
+    """Report of playlist assignment operation."""
+
+    assigned: int = 0
+    failed: int = 0
+    skipped: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class SyncReport:
     """Report of upload/transcript sync operation."""
 
