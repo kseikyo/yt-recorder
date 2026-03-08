@@ -164,7 +164,7 @@ class YouTubeBrowserAdapter:
                         const body = document.body;
                         if (!body) return null;
                         const text = body.innerText || '';
-                        if (text.includes('too long') || text.includes('Video is too long')) {
+                        if (text.includes('Video is too long') || text.includes('video is too long')) {
                             return { error: 'too_long' };
                         }
                         if (text.includes('upload limit') || text.includes('daily upload') || text.includes('daily limit')) {
