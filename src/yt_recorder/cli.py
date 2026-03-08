@@ -358,7 +358,7 @@ def reset_limits() -> None:
         return
 
     n = 0
-    for account_name, account_value in doc["accounts"].items():  # type: ignore[union-attr]
+    for _account_name, account_value in doc["accounts"].items():  # type: ignore[union-attr]
         if isinstance(account_value, dict) and "upload_limit_secs" in account_value:
             del account_value["upload_limit_secs"]
             n += 1
