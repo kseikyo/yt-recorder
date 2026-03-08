@@ -474,7 +474,27 @@ def health() -> None:
         click.echo("  ✗ yt-dlp not found in PATH", err=True)
         checks_failed += 1
 
-    # Check 5: Registry accessible (if exists)
+    # Check 5: ffmpeg available
+    click.echo("Checking ffmpeg...")
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        click.echo(f"  ✓ ffmpeg found at {ffmpeg_path}")
+        checks_passed += 1
+    else:
+        click.echo("  ✗ ffmpeg not found  (required for video splitting — install: brew install ffmpeg)", err=True)
+        checks_failed += 1
+
+    # Check 6: ffprobe available
+    click.echo("Checking ffprobe...")
+    ffprobe_path = shutil.which("ffprobe")
+    if ffprobe_path:
+        click.echo(f"  ✓ ffprobe found at {ffprobe_path}")
+        checks_passed += 1
+    else:
+        click.echo("  ✗ ffprobe not found  (required for video splitting — install: brew install ffmpeg)", err=True)
+        checks_failed += 1
+
+    # Check 7: Registry accessible (if exists)
     click.echo("Checking registry...")
     # Registry is per-directory, so we just check if the concept is understood
     # In practice, registry.md is created per upload directory
