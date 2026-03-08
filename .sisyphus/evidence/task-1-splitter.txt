@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.23, pytest-8.4.2, pluggy-1.6.0 -- /Users/lucassierota/.cache/uv/builds-v0/.tmpOnIfot/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/lucassierota/Desktop/recordings/yt-recorder-video-splitting
+configfile: pyproject.toml
+collecting ... collected 18 items
+
+tests/test_splitter.py::TestTierConstants::test_tier_1hr_value PASSED    [  5%]
+tests/test_splitter.py::TestTierConstants::test_tier_15min_value PASSED  [ 11%]
+tests/test_splitter.py::TestGetDuration::test_duration_from_json_ffprobe PASSED [ 16%]
+tests/test_splitter.py::TestGetDuration::test_duration_ffprobe_not_found PASSED [ 22%]
+tests/test_splitter.py::TestGetDuration::test_duration_ffprobe_nonzero_exit PASSED [ 27%]
+tests/test_splitter.py::TestGetDuration::test_duration_invalid_json PASSED [ 33%]
+tests/test_splitter.py::TestGetDuration::test_duration_timeout_passed PASSED [ 38%]
+tests/test_splitter.py::TestNeedsSplit::test_needs_split_true_when_over_threshold PASSED [ 44%]
+tests/test_splitter.py::TestNeedsSplit::test_needs_split_false_when_under_threshold PASSED [ 50%]
+tests/test_splitter.py::TestNeedsSplit::test_needs_split_false_at_exact_threshold PASSED [ 55%]
+tests/test_splitter.py::TestSplit::test_split_returns_original_when_no_split_needed PASSED [ 61%]
+tests/test_splitter.py::TestSplit::test_split_returns_parts_when_split_needed PASSED [ 66%]
+tests/test_splitter.py::TestSplit::test_split_raises_when_ffmpeg_not_found PASSED [ 72%]
+tests/test_splitter.py::TestSplit::test_split_ffmpeg_timeout_passed PASSED [ 77%]
+tests/test_splitter.py::TestGetMetadata::test_get_metadata_returns_correct_fields PASSED [ 83%]
+tests/test_splitter.py::TestGetMetadata::test_get_metadata_no_streams PASSED [ 88%]
+tests/test_splitter.py::TestGetMetadata::test_get_metadata_ffprobe_not_found PASSED [ 94%]
+tests/test_splitter.py::TestGetMetadata::test_get_metadata_ffprobe_nonzero_exit PASSED [100%]
+
+============================== 18 passed in 0.07s ==============================
