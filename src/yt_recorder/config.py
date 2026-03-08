@@ -26,6 +26,7 @@ class Config:
     headless: bool = True
     transcript_language: str = "en"
     transcript_delay: float = 1.0
+    split_threshold_secs: float = 3420.0
 
     @staticmethod
     def default_config_dir() -> Path:
@@ -73,15 +74,31 @@ def load_config(config_path: Path | None = None) -> Config:
     if "accounts" in data:
         from yt_recorder.domain.models import YouTubeAccount
 
-        config.accounts = [
-            YouTubeAccount(
-                name=name,
-                storage_state=Path(path),
-                cookies_path=Path(path).parent / f"{name}_cookies.txt",
-                role="primary" if i == 0 else "mirror",
-            )
-            for i, (name, path) in enumerate(data["accounts"].items())
-        ]
+        accounts = []
+        for i, (name, value) in enumerate(data["accounts"].items()):
+            role = "primary" if i == 0 else "mirror"
+            if isinstance(value, str):
+                account = YouTubeAccount(
+                    name=name,
+                    storage_state=Path(value),
+                    cookies_path=Path(value).parent / f"{name}_cookies.txt",
+                    role=role,
+                )
+            elif isinstance(value, dict):
+                path_str = str(value["path"])
+                limit_value = value.get("upload_limit_secs")
+                account = YouTubeAccount(
+                    name=name,
+                    storage_state=Path(path_str),
+                    cookies_path=Path(path_str).parent / f"{name}_cookies.txt",
+                    role=role,
+                    upload_limit_secs=float(limit_value) if limit_value is not None else None,
+                )
+            else:
+                continue
+            accounts.append(account)
+
+        config.accounts = accounts
 
     if "scanner" in data:
         scanner = data["scanner"]
@@ -99,6 +116,8 @@ def load_config(config_path: Path | None = None) -> Config:
             config.delays["nav"] = (upload["delay_min"], upload["delay_max"])
         if "headless" in upload:
             config.headless = upload["headless"]
+        if "split_threshold_secs" in upload:
+            config.split_threshold_secs = float(upload["split_threshold_secs"])
 
     if "transcript" in data:
         transcript = data["transcript"]
@@ -135,6 +154,7 @@ limit = 5
 delay_min = 1.0
 delay_max = 3.0
 headless = true
+# split_threshold_secs = 3420  # 57 minutes — adjust if your account has a different limit
 
 [transcript]
 language = "en"
@@ -142,3 +162,22 @@ delay = 1.0
 """
 
     config_path.write_text(template)
+
+
+def save_detected_limit(config_path: Path, account_name: str, limit_secs: float) -> None:
+    """Persist a detected upload limit for an account to config.toml."""
+    import tomlkit
+
+    content = config_path.read_text(encoding="utf-8")
+    doc = tomlkit.parse(content)
+    account_value = doc["accounts"][account_name]  # type: ignore[index]
+
+    if isinstance(account_value, str):
+        table = tomlkit.table()
+        table["path"] = account_value
+        table["upload_limit_secs"] = limit_secs
+        doc["accounts"][account_name] = table  # type: ignore[index]
+    else:
+        doc["accounts"][account_name]["upload_limit_secs"] = limit_secs  # type: ignore[index]
+
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
