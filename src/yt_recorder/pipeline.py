@@ -4,17 +4,19 @@ import logging
 from datetime import date
 from pathlib import Path
 from time import sleep
-from typing import Callable
+from typing import TYPE_CHECKING, Callable, cast
 
 from yt_recorder.adapters.raid import RaidAdapter
 from yt_recorder.adapters.registry import MarkdownRegistryStore
 from yt_recorder.adapters.scanner import scan_recordings
 from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
-from yt_recorder.config import Config, load_config
+from yt_recorder.config import Config, load_config, save_detected_limit
 from yt_recorder.domain.exceptions import (
+    DailyLimitError,
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
     TranscriptUnavailableError,
+    VideoTooLongError,
 )
 from yt_recorder.domain.formatters import format_transcript_md, parse_srt, title_from_filename
 from yt_recorder.domain.models import (
@@ -29,6 +31,10 @@ from yt_recorder.domain.protocols import RegistryStore, TranscriptFetcher
 from yt_recorder.utils import safe_resolve
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from yt_recorder.adapters.splitter import VideoSplitter
+    from yt_recorder.domain.models import YouTubeAccount
 
 
 class RecordingPipeline:
@@ -112,14 +118,21 @@ class RecordingPipeline:
         if not files_to_process and not retry_failed:
             return SyncReport(total_registered=len(entries))
 
+        from yt_recorder.adapters.splitter import VideoSplitter
+
+        splitter = VideoSplitter()
         self.raid.open()
+        stop_all_uploads = False
 
         try:
             for idx, (path, playlist) in enumerate(files_to_process):
+                if stop_all_uploads:
+                    break
                 if progress_callback:
                     progress_callback(idx + 1, len(files_to_process), path.name)
                 try:
                     title = title_from_filename(path.name)
+                    file_key = str(path.relative_to(directory))
 
                     if single_account:
                         adapter = self.raid.get_adapter(single_account)
@@ -129,13 +142,89 @@ class RecordingPipeline:
                         if not pl_ok:
                             playlist_failed += 1
                     else:
-                        results, pf = self.raid.upload(path, title, playlist)
-                        playlist_failed += pf
+                        if not isinstance(getattr(self.raid, "mirrors", None), list):
+                            results, pf = self.raid.upload(path, title, playlist)
+                            playlist_failed += pf
+                        else:
+                            duration: float | None = None
+                            accounts = [self.raid.primary, *self.raid.mirrors]
+                            all_account_results: dict[str, UploadResult | None] = {
+                                account.name: None for account in accounts
+                            }
+
+                            for account in accounts:
+                                account_name = account.name
+                                try:
+                                    account_limit = account.upload_limit_secs
+                                    if account_limit is not None:
+                                        if duration is None:
+                                            duration = splitter.get_duration(path)
+                                        over_limit = duration > account_limit
+                                    else:
+                                        over_limit = False
+
+                                    if over_limit:
+                                        if account_limit is None:
+                                            continue
+                                        assert account_limit is not None
+                                        temp_dir = path.parent / f".{path.stem}_parts"
+                                        if temp_dir.exists():
+                                            parts = sorted(
+                                                temp_dir.glob(f"{path.stem}_part*{path.suffix}")
+                                            )
+                                            if not parts:
+                                                parts = splitter.split(path, account_limit)
+                                        else:
+                                            parts = splitter.split(path, account_limit)
+                                        self._upload_parts_to_account(
+                                            raid=self.raid,
+                                            registry=self.registry,
+                                            account_name=account_name,
+                                            parts=parts,
+                                            base_title=title,
+                                            playlist=playlist,
+                                            original_path=path,
+                                            directory=directory,
+                                        )
+                                    else:
+                                        result = self.raid.upload_to_account(
+                                            account_name, path, title
+                                        )
+                                        playlist_ok = self.raid.assign_playlist_to_account(
+                                            account_name,
+                                            result.video_id,
+                                            playlist,
+                                        )
+                                        if not playlist_ok:
+                                            playlist_failed += 1
+                                        all_account_results[account_name] = result
+                                except VideoTooLongError:
+                                    detected_limit = self._detect_tier(
+                                        raid=self.raid,
+                                        splitter=splitter,
+                                        account=account,
+                                        path=path,
+                                        title=title,
+                                        playlist=playlist,
+                                        directory=directory,
+                                        registry=self.registry,
+                                    )
+                                    if detected_limit is not None:
+                                        config_path = Config.default_config_dir() / "config.toml"
+                                        save_detected_limit(
+                                            config_path, account_name, detected_limit
+                                        )
+                                except DailyLimitError:
+                                    logger.warning("Daily limit hit for %s, stopping", account_name)
+                                    stop_all_uploads = True
+                                    break
+
+                            results = all_account_results
 
                     all_succeeded = all(r is not None for r in results.values())
 
                     entry = RegistryEntry(
-                        file=str(path.relative_to(directory)),
+                        file=file_key,
                         playlist=playlist,
                         uploaded_date=date.today(),
                         transcript_status=TranscriptStatus.PENDING,
@@ -210,6 +299,94 @@ class RecordingPipeline:
             total_registered=len(entries) + uploaded,
             errors=errors,
         )
+
+    def _detect_tier(
+        self,
+        raid: RaidAdapter,
+        splitter: VideoSplitter,
+        account: YouTubeAccount,
+        path: Path,
+        title: str,
+        playlist: str,
+        directory: Path,
+        registry: RegistryStore,
+    ) -> float | None:
+        from yt_recorder.adapters.splitter import TIER_1HR, TIER_15MIN
+
+        account_name = account.name
+        for tier_limit in [TIER_1HR, TIER_15MIN]:
+            parts = splitter.split(path, tier_limit)
+            try:
+                self._upload_parts_to_account(
+                    raid=raid,
+                    registry=registry,
+                    account_name=account_name,
+                    parts=parts,
+                    base_title=title,
+                    playlist=playlist,
+                    original_path=path,
+                    directory=directory,
+                )
+                return tier_limit
+            except VideoTooLongError:
+                splitter.cleanup_parts(parts)
+                continue
+        logger.error("All tiers failed for %s on account %s", path.name, account_name)
+        return None
+
+    def _upload_parts_to_account(
+        self,
+        raid: RaidAdapter,
+        registry: RegistryStore,
+        account_name: str,
+        parts: list[Path],
+        base_title: str,
+        playlist: str,
+        original_path: Path,
+        directory: Path,
+    ) -> None:
+        n = len(parts)
+        if n == 0:
+            return
+
+        file_key = str(original_path.relative_to(directory))
+        truncated_base = base_title[:100]
+
+        registry_with_parts = cast(MarkdownRegistryStore, registry)
+        existing_parts = registry_with_parts.get_parts_for_parent(file_key)
+        uploaded_part_indexes = {
+            e.part_index
+            for e in existing_parts
+            if e.part_index is not None and e.account_ids.get(account_name, "—") != "—"
+        }
+
+        for i, part in enumerate(parts, 1):
+            if i in uploaded_part_indexes:
+                continue
+
+            part_title = f"{truncated_base} [Part {i}/{n}]"
+            description = f"Part {i} of {n}. Original: {original_path.name}"
+            result = raid.upload_to_account(account_name, part, part_title, description=description)
+            playlist_ok = raid.assign_playlist_to_account(account_name, result.video_id, playlist)
+            if not playlist_ok:
+                logger.warning(
+                    "Playlist assignment failed for %s on %s",
+                    playlist,
+                    account_name,
+                )
+
+            part_file_key = str(part.relative_to(directory))
+            entry = RegistryEntry(
+                file=part_file_key,
+                playlist=playlist,
+                uploaded_date=date.today(),
+                transcript_status=TranscriptStatus.PENDING,
+                account_ids={account_name: result.video_id},
+                part_index=i,
+                total_parts=n,
+                parent_file=file_key,
+            )
+            registry.append(entry)
 
     def assign_playlists(
         self,
@@ -425,14 +602,32 @@ class RecordingPipeline:
         errors: list[str] = []
         eligible: list[str] = []
 
+        from yt_recorder.adapters.splitter import VideoSplitter
+
+        splitter = VideoSplitter()
+        registry_with_coverage = cast(MarkdownRegistryStore, self.registry)
+
         for entry in entries:
             path = safe_resolve(directory, entry.file)
             if not path.exists():
                 continue
 
-            # Check all accounts uploaded
-            all_uploaded = all(entry.account_ids.get(name, "—") != "—" for name in account_names)
-            if not all_uploaded:
+            all_covered: bool
+            coverage_results: list[bool] = []
+            coverage_supported = True
+            for name in account_names:
+                covered = registry_with_coverage.is_account_covered(entry.file, name)
+                if not isinstance(covered, bool):
+                    coverage_supported = False
+                    break
+                coverage_results.append(covered)
+
+            if coverage_supported:
+                all_covered = all(coverage_results)
+            else:
+                all_covered = all(entry.account_ids.get(name, "—") != "—" for name in account_names)
+
+            if not all_covered:
                 skipped += 1
                 continue
 
@@ -447,6 +642,11 @@ class RecordingPipeline:
 
             try:
                 path.unlink()
+                temp_dir = path.parent / f".{path.stem}_parts"
+                if temp_dir.exists():
+                    parts = sorted(temp_dir.glob(f"{path.stem}_part*{path.suffix}"))
+                    if parts:
+                        splitter.cleanup_parts(parts)
                 deleted += 1
             except OSError as e:
                 errors.append(f"Failed to delete {entry.file}: {e}")
