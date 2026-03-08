@@ -333,6 +333,44 @@ def clean(directory: Path, dry_run: bool) -> None:
             click.echo(f"  - {e}")
 
 
+@main.command(name="reset-limits")
+def reset_limits() -> None:
+    """Clear cached upload limits for all accounts.
+
+    Removes upload_limit_secs from config.toml for each account.
+    Next upload will re-detect the limit.
+    """
+    from yt_recorder.config import Config
+
+    config_path = Config.default_config_dir() / "config.toml"
+
+    if not config_path.exists():
+        click.echo("No cached limits found.")
+        return
+
+    import tomlkit
+
+    content = config_path.read_text(encoding="utf-8")
+    doc = tomlkit.parse(content)
+
+    if "accounts" not in doc:
+        click.echo("No cached limits found.")
+        return
+
+    n = 0
+    for account_name, account_value in doc["accounts"].items():  # type: ignore[union-attr]
+        if isinstance(account_value, dict) and "upload_limit_secs" in account_value:
+            del account_value["upload_limit_secs"]
+            n += 1
+
+    if n == 0:
+        click.echo("No cached limits found.")
+        return
+
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+    click.echo(f"Reset upload limits for {n} accounts. Next upload will re-detect.")
+
+
 def _find_free_port() -> int:
     """Find free TCP port for Chrome DevTools Protocol.
 
@@ -481,7 +519,10 @@ def health() -> None:
         click.echo(f"  ✓ ffmpeg found at {ffmpeg_path}")
         checks_passed += 1
     else:
-        click.echo("  ✗ ffmpeg not found  (required for video splitting — install: brew install ffmpeg)", err=True)
+        click.echo(
+            "  ✗ ffmpeg not found  (required for video splitting — install: brew install ffmpeg)",
+            err=True,
+        )
         checks_failed += 1
 
     # Check 6: ffprobe available
@@ -491,7 +532,10 @@ def health() -> None:
         click.echo(f"  ✓ ffprobe found at {ffprobe_path}")
         checks_passed += 1
     else:
-        click.echo("  ✗ ffprobe not found  (required for video splitting — install: brew install ffmpeg)", err=True)
+        click.echo(
+            "  ✗ ffprobe not found  (required for video splitting — install: brew install ffmpeg)",
+            err=True,
+        )
         checks_failed += 1
 
     # Check 7: Registry accessible (if exists)
