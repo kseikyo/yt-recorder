@@ -314,6 +314,11 @@ class RecordingPipeline:
         from yt_recorder.adapters.splitter import TIER_1HR, TIER_15MIN
 
         account_name = account.name
+        # Clean up any stale temp dir from a previous crashed tier detection attempt
+        _temp_dir = path.parent / f".{path.stem}_parts"
+        if _temp_dir.exists():
+            _existing = list(_temp_dir.iterdir())
+            splitter.cleanup_parts(_existing)
         for tier_limit in [TIER_1HR, TIER_15MIN]:
             parts = splitter.split(path, tier_limit)
             try:
@@ -631,8 +636,11 @@ class RecordingPipeline:
                 skipped += 1
                 continue
 
-            # Check transcript terminal
-            if entry.transcript_status not in terminal:
+            # Check transcript terminal — skip for split parents (no video_id to fetch transcript from)
+            parts_for_entry = registry_with_coverage.get_parts_for_parent(entry.file)
+            is_split_parent = bool(parts_for_entry)
+
+            if not is_split_parent and entry.transcript_status not in terminal:
                 skipped += 1
                 continue
 

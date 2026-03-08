@@ -35,7 +35,8 @@ class TestRecordingPipeline:
     def mock_registry(self) -> Mock:
         registry = Mock()
         registry.load = Mock(return_value=[])
-        registry.append = Mock()
+        registry.get_parts_for_parent = Mock(return_value=[])
+        registry.is_account_covered = Mock(return_value=True)
         return registry
 
     @pytest.fixture
@@ -459,6 +460,9 @@ class TestCleanSynced:
     def mock_registry(self) -> Mock:
         registry = Mock()
         registry.load = Mock(return_value=[])
+        registry.get_parts_for_parent = Mock(return_value=[])
+        # is_account_covered returns non-bool to trigger fallback to account_ids check
+        registry.is_account_covered = Mock(return_value=None)
         return registry
 
     @pytest.fixture

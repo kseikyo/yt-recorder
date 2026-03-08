@@ -167,7 +167,7 @@ class YouTubeBrowserAdapter:
                         if (text.includes('too long') || text.includes('Video is too long')) {
                             return { error: 'too_long' };
                         }
-                        if (text.includes('upload limit') || text.includes('daily')) {
+                        if (text.includes('upload limit') || text.includes('daily upload') || text.includes('daily limit')) {
                             return { error: 'daily_limit' };
                         }
                         const done = document.querySelector('#done-button');
