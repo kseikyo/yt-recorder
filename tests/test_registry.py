@@ -410,7 +410,7 @@ class TestRegistryMigration:
         store._write_all(entries)
 
         content = registry_path.read_text(encoding="utf-8")
-        assert "<!-- registry_version: 2 -->" in content
+        assert "<!-- registry_version: 3 -->" in content
         assert "✅" not in content
         assert "| done |" in content
 
