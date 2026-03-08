@@ -31,12 +31,13 @@ class VideoUploader(Protocol):
         """Close connection to the video hosting platform."""
         ...
 
-    def upload(self, path: Path, title: str) -> UploadResult:
+    def upload(self, path: Path, title: str, description: str = "") -> UploadResult:
         """Upload a video file.
 
         Args:
             path: Path to the video file
             title: Title for the uploaded video
+            description: Optional description for the uploaded video
 
         Returns:
             UploadResult with video_id, url, title, and account_name

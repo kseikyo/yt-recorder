@@ -20,9 +20,11 @@ from playwright.sync_api import (
 from yt_recorder import constants
 from yt_recorder.domain.exceptions import (
     BotDetectionError,
+    DailyLimitError,
     SelectorChangedError,
     SessionExpiredError,
     UploadTimeoutError,
+    VideoTooLongError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
 from yt_recorder.utils import find_chrome
@@ -85,7 +87,7 @@ class YouTubeBrowserAdapter:
         if self._playwright:
             self._playwright.stop()
 
-    def upload(self, path: Path, title: str) -> UploadResult:
+    def upload(self, path: Path, title: str, description: str = "") -> UploadResult:
         if not self.context:
             raise RuntimeError("Browser not opened. Call open() first.")
 
@@ -115,6 +117,10 @@ class YouTubeBrowserAdapter:
             if not title_input:
                 raise SelectorChangedError("Title input selector not found")
             title_input.fill(title)
+
+            if description:
+                desc_box = page.locator(constants.DESCRIPTION_TEXTAREA)
+                desc_box.fill(description)
 
             self._random_delay("field")
 
@@ -153,18 +159,36 @@ class YouTubeBrowserAdapter:
 
             # Wait for file upload to finish (Done button becomes enabled)
             try:
-                page.wait_for_function(
+                handle = page.wait_for_function(
                     """() => {
+                        const body = document.body;
+                        if (!body) return null;
+                        const text = body.innerText || '';
+                        if (text.includes('too long') || text.includes('Video is too long')) {
+                            return { error: 'too_long' };
+                        }
+                        if (text.includes('upload limit') || text.includes('daily')) {
+                            return { error: 'daily_limit' };
+                        }
                         const done = document.querySelector('#done-button');
-                        if (!done) return false;
-                        return done.getAttribute('aria-disabled') !== 'true';
+                        if (done && done.getAttribute('aria-disabled') !== 'true') {
+                            return { done: true };
+                        }
+                        return null;
                     }""",
                     timeout=constants.UPLOAD_TIMEOUT_SECONDS * 1000,
                 )
+                result: object = handle.json_value() if handle is not None else None
             except PlaywrightTimeoutError as e:
                 raise UploadTimeoutError(
                     f"Upload exceeded {constants.UPLOAD_TIMEOUT_SECONDS}s timeout"
                 ) from e
+
+            if isinstance(result, dict):
+                if result.get("error") == "too_long":
+                    raise VideoTooLongError("YouTube rejected video: too long for this account")
+                if result.get("error") == "daily_limit":
+                    raise DailyLimitError("YouTube daily upload limit reached")
 
             done_btn = page.query_selector(constants.DONE_BUTTON)
             if not done_btn:
