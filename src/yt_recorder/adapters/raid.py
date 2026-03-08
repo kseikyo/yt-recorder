@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
+from yt_recorder.domain.exceptions import DailyLimitError, VideoTooLongError
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
 logger = logging.getLogger(__name__)
@@ -72,16 +73,19 @@ class RaidAdapter:
         return adapter
 
     def upload(
-        self, path: Path, title: str, playlist: str
+        self, path: Path, title: str, playlist: str, description: str = ""
     ) -> tuple[dict[str, UploadResult | None], int]:
         """Upload to all accounts.
 
         Primary first (must succeed). Mirrors best-effort (failures logged as None).
+        DailyLimitError from mirrors is caught and logged; from primary it propagates.
+        VideoTooLongError propagates for both primary and mirrors.
 
         Args:
             path: Path to video file
             title: Video title
             playlist: Playlist name to assign
+            description: Optional video description
 
         Returns:
             Tuple of (account results dict, playlist_failures count).
@@ -90,7 +94,7 @@ class RaidAdapter:
         playlist_failures = 0
 
         primary_adapter = self._adapters[self.primary.name]
-        primary_result = primary_adapter.upload(path, title)
+        primary_result = primary_adapter.upload(path, title, description=description)
         results[self.primary.name] = primary_result
         playlist_ok = primary_adapter.assign_playlist(primary_result.video_id, playlist)
         if not playlist_ok:
@@ -100,14 +104,58 @@ class RaidAdapter:
         for mirror in self.mirrors:
             try:
                 mirror_adapter = self._adapters[mirror.name]
-                mirror_result = mirror_adapter.upload(path, title)
+                mirror_result = mirror_adapter.upload(path, title, description=description)
                 results[mirror.name] = mirror_result
                 playlist_ok = mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
                 if not playlist_ok:
                     logger.warning("Playlist assignment failed for %s on %s", playlist, mirror.name)
                     playlist_failures += 1
+            except DailyLimitError as e:
+                logger.warning("Mirror %s daily limit reached: %s", mirror.name, e)
+                results[mirror.name] = None
+            except VideoTooLongError:
+                raise
             except Exception as e:
                 logger.warning("Mirror %s failed: %s", mirror.name, e)
                 results[mirror.name] = None
 
         return results, playlist_failures
+
+    def upload_to_account(
+        self, account_name: str, path: Path, title: str, description: str = ""
+    ) -> UploadResult:
+        """Upload to a specific account. Used by pipeline for per-account split parts.
+
+        Args:
+            account_name: Name of the account to upload to
+            path: Path to video file
+            title: Video title
+            description: Optional video description
+
+        Returns:
+            UploadResult for the uploaded video
+
+        Raises:
+            VideoTooLongError: If video exceeds account's duration limit
+            DailyLimitError: If daily upload limit reached
+            ValueError: If account not found
+        """
+        adapter = self._adapters[account_name]
+        return adapter.upload(path, title, description=description)
+
+    def assign_playlist_to_account(self, account_name: str, video_id: str, playlist: str) -> bool:
+        """Assign playlist on specific account.
+
+        Args:
+            account_name: Name of the account
+            video_id: YouTube video ID
+            playlist: Playlist name to assign
+
+        Returns:
+            True if assignment succeeded, False otherwise
+
+        Raises:
+            ValueError: If account not found
+        """
+        adapter = self._adapters[account_name]
+        return adapter.assign_playlist(video_id, playlist)

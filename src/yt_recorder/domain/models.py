@@ -55,6 +55,9 @@ class RegistryEntry:
     uploaded_date: date
     transcript_status: TranscriptStatus
     account_ids: dict[str, str]
+    part_index: int | None = None
+    total_parts: int | None = None
+    parent_file: str | None = None
 
     @property
     def has_transcript(self) -> bool:
@@ -77,6 +80,7 @@ class YouTubeAccount:
     storage_state: Path
     cookies_path: Path
     role: str
+    upload_limit_secs: float | None = None
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,7 @@ FILE_INPUT = 'input[type="file"]'
 
 # Form field selectors
 TITLE_INPUT = "#title-textarea #textbox"
+DESCRIPTION_TEXTAREA = "#description-textarea #textbox"
 NOT_MADE_FOR_KIDS = 'tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]'
 
 # Navigation selectors
@@ -22,6 +23,8 @@ VIDEO_URL_ELEMENT = "span.video-url-fadeable a"
 
 # Upload progress tracking
 UPLOAD_PROGRESS = "ytcp-video-upload-progress"
+VIDEO_TOO_LONG_ERROR = "text=Video is too long"
+DAILY_LIMIT_ERROR = "text=upload limit"
 
 # Bot detection indicators
 CAPTCHA_INDICATOR = "iframe[src*='recaptcha'], div#captcha-container"

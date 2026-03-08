@@ -1,12 +1,8 @@
 {
-  "active_plan": "/Users/lucassierota/Desktop/recordings/yt-recorder/.sisyphus/plans/youtube-selector-fix.md",
-  "started_at": "2026-02-23T03:10:42.218Z",
-  "session_ids": ["ses_37785b3f2ffeIGuaPiimWtWMf3"],
-  "plan_name": "youtube-selector-fix",
-  "progress": {
-    "completed": ["1", "2", "3", "4"],
-    "in_progress": [],
-    "remaining": ["5"]
-  },
+  "active_plan": "/Users/lucassierota/Desktop/recordings/yt-recorder-video-splitting/.sisyphus/plans/video-splitting.md",
+  "started_at": "2026-03-06T10:10:38.660Z",
+  "session_ids": ["ses_3357ca183ffeZJ810uFbGNu98u", "ses_332248fb9ffe8CwuK5SgKX8m5E"],
+  "plan_name": "video-splitting",
+  "worktree_path": "/Users/lucassierota/Desktop/recordings/yt-recorder-video-splitting",
   "status": "active"
 }

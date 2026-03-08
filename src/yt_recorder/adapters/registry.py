@@ -16,8 +16,8 @@ from yt_recorder.domain.exceptions import (
 )
 from yt_recorder.domain.models import RegistryEntry, TranscriptStatus
 
-_REGISTRY_VERSION = 2
-_VERSION_COMMENT = "<!-- registry_version: 2 -->"
+_REGISTRY_VERSION = 3
+_VERSION_COMMENT = "<!-- registry_version: 3 -->"
 _V1_TRANSCRIPT_MAP: dict[str, TranscriptStatus] = {
     "✅": TranscriptStatus.DONE,
     "❌": TranscriptStatus.PENDING,
@@ -225,6 +225,45 @@ class MarkdownRegistryStore:
         except RegistryFileNotFoundError:
             return False
 
+    def get_parts_for_parent(self, parent_file: str) -> list[RegistryEntry]:
+        """Return all entries where parent_file matches.
+
+        Args:
+            parent_file: Relative path of the original (parent) file
+
+        Returns:
+            List of RegistryEntry objects that are parts of parent_file
+        """
+        try:
+            entries = self.load()
+        except RegistryFileNotFoundError:
+            return []
+        return [e for e in entries if e.parent_file == parent_file]
+
+    def is_account_covered(self, file: str, account_name: str) -> bool:
+        """True if account has a video_id for this file (either full video or all parts).
+
+        Args:
+            file: Relative file path of the original video
+            account_name: Account name to check
+
+        Returns:
+            True if account has coverage (direct or via all parts)
+        """
+        try:
+            entries = self.load()
+        except RegistryFileNotFoundError:
+            return False
+        original = next((e for e in entries if e.file == file and e.part_index is None), None)
+        if original is None:
+            return False
+        if original.account_ids.get(account_name, "—") != "—":
+            return True
+        parts = [e for e in entries if e.parent_file == file]
+        if not parts:
+            return False
+        return all(e.account_ids.get(account_name, "—") != "—" for e in parts)
+
     def get_video_id(self, file: str, account: str) -> str | None:
         """Get video ID for a file on a specific account.
 
@@ -266,6 +305,9 @@ class MarkdownRegistryStore:
             "Uploaded",
             "Transcript",
             *self.account_names,
+            "Part",
+            "Total",
+            "Parent",
         ]
         return "| " + " | ".join(columns) + " |"
 
@@ -277,6 +319,9 @@ class MarkdownRegistryStore:
             "Uploaded",
             "Transcript",
             *self.account_names,
+            "Part",
+            "Total",
+            "Parent",
         ]
         return "| " + " | ".join(["---"] * len(columns)) + " |"
 
@@ -290,6 +335,9 @@ class MarkdownRegistryStore:
             entry.uploaded_date.isoformat(),
             entry.transcript_status.value,
             *account_values,
+            str(entry.part_index) if entry.part_index is not None else "",
+            str(entry.total_parts) if entry.total_parts is not None else "",
+            entry.parent_file if entry.parent_file is not None else "",
         ]
 
         return "| " + " | ".join(values) + " |"
@@ -325,9 +373,22 @@ class MarkdownRegistryStore:
         transcript_status = self._parse_transcript_status(transcript_raw)
 
         account_ids: dict[str, str] = {}
+        n = len(self.account_names)
         for i, account_name in enumerate(self.account_names):
             idx = 4 + i
             account_ids[account_name] = parts[idx] if idx < len(parts) else "—"
+
+        part_index: int | None = None
+        total_parts: int | None = None
+        parent_file: str | None = None
+
+        part_idx = 4 + n
+        if len(parts) > part_idx and parts[part_idx]:
+            part_index = int(parts[part_idx])
+        if len(parts) > part_idx + 1 and parts[part_idx + 1]:
+            total_parts = int(parts[part_idx + 1])
+        if len(parts) > part_idx + 2 and parts[part_idx + 2]:
+            parent_file = parts[part_idx + 2].strip()
 
         return RegistryEntry(
             file=file_path,
@@ -335,6 +396,9 @@ class MarkdownRegistryStore:
             uploaded_date=uploaded_date,
             transcript_status=transcript_status,
             account_ids=account_ids,
+            part_index=part_index,
+            total_parts=total_parts,
+            parent_file=parent_file,
         )
 
     @staticmethod
