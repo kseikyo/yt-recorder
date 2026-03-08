@@ -51,3 +51,18 @@ class SelectorChangedError(YouTubeError):
 
 class UploadTimeoutError(YouTubeError):
     """Upload exceeded timeout."""
+
+
+class DailyLimitError(YouTubeError):
+    """Daily upload limit reached."""
+
+
+class VideoTooLongError(YouTubeError):
+    """Video exceeds account's duration limit."""
+    def __init__(self, message: str, detected_limit_secs: float | None = None) -> None:
+        super().__init__(message)
+        self.detected_limit_secs = detected_limit_secs
+
+
+class SplitterError(YTRecorderError):
+    """Failed to split video file."""
