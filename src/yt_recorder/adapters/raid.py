@@ -4,9 +4,12 @@ import logging
 from pathlib import Path
 from typing import Callable
 
+from playwright.sync_api import Browser, Playwright, sync_playwright
+
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import DailyLimitError, VideoTooLongError
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
+from yt_recorder.utils import find_chrome
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ class RaidAdapter:
         accounts: list[YouTubeAccount],
         headless: bool,
         delays: dict[str, tuple[float, float]],
-        adapter_factory: Callable[[YouTubeAccount], YouTubeBrowserAdapter] | None = None,
+        adapter_factory: Callable[[YouTubeAccount, Browser], YouTubeBrowserAdapter] | None = None,
     ):
         if not accounts:
             raise ValueError("No accounts configured. Run: yt-recorder setup --account <name>")
@@ -37,14 +40,21 @@ class RaidAdapter:
         self.headless = headless
         self.delays = delays
         self._factory = adapter_factory or (
-            lambda acct: YouTubeBrowserAdapter(acct, headless, delays)
+            lambda acct, browser: YouTubeBrowserAdapter(acct, browser, delays)
         )
         self._adapters: dict[str, YouTubeBrowserAdapter] = {}
+        self._playwright: Playwright | None = None
+        self._browser: Browser | None = None
 
     def open(self) -> None:
         """Launch browsers for all accounts once."""
+        chrome_path = find_chrome()
+        self._playwright = sync_playwright().start()
+        self._browser = self._playwright.chromium.launch(
+            headless=self.headless, executable_path=chrome_path
+        )
         for acct in [self.primary, *self.mirrors]:
-            adapter = self._factory(acct)
+            adapter = self._factory(acct, self._browser)
             adapter.open()
             self._adapters[acct.name] = adapter
 
@@ -53,6 +63,10 @@ class RaidAdapter:
         for adapter in self._adapters.values():
             adapter.close()
         self._adapters.clear()
+        if self._browser:
+            self._browser.close()
+        if self._playwright:
+            self._playwright.stop()
 
     def get_adapter(self, account_name: str) -> YouTubeBrowserAdapter:
         """Get adapter for specific account.

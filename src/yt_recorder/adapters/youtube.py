@@ -10,8 +10,6 @@ from playwright.sync_api import (
     Browser,
     BrowserContext,
     Page,
-    Playwright,
-    sync_playwright,
 )
 from playwright.sync_api import (
     TimeoutError as PlaywrightTimeoutError,
@@ -27,7 +25,6 @@ from yt_recorder.domain.exceptions import (
     VideoTooLongError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
-from yt_recorder.utils import find_chrome
 
 logger = logging.getLogger(__name__)
 
@@ -36,15 +33,13 @@ class YouTubeBrowserAdapter:
     def __init__(
         self,
         account: YouTubeAccount,
-        headless: bool,
+        browser: Browser,
         delays: dict[str, tuple[float, float]],
     ) -> None:
         self.account = account
-        self.headless = headless
+        self.browser = browser
         self.delays = delays
-        self.browser: Browser | None = None
         self.context: BrowserContext | None = None
-        self._playwright: Playwright | None = None
 
     def _random_delay(self, action_type: str) -> None:
         if action_type not in self.delays:
@@ -69,12 +64,6 @@ class YouTubeBrowserAdapter:
             pass
 
     def open(self) -> None:
-        chrome_path = find_chrome()
-        self._playwright = sync_playwright().start()
-        self.browser = self._playwright.chromium.launch(
-            headless=self.headless,
-            executable_path=chrome_path,
-        )
         self.context = self.browser.new_context(storage_state=str(self.account.storage_state))
 
     def close(self) -> None:
@@ -82,10 +71,6 @@ class YouTubeBrowserAdapter:
             self.context.storage_state(path=str(self.account.storage_state))
             os.chmod(str(self.account.storage_state), 0o600)
             self.context.close()
-        if self.browser:
-            self.browser.close()
-        if self._playwright:
-            self._playwright.stop()
 
     def upload(self, path: Path, title: str, description: str = "") -> UploadResult:
         if not self.context:

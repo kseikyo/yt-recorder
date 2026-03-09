@@ -1,0 +1,8 @@
+    def assign_playlists(
+        self,
+        directory: Path,
+        single_account: str | None = None,
+        dry_run: bool = False,
+        on_progress: Callable[[str, str, str, bool], None] | None = None,
+    ) -> PlaylistReport:
+        """Assign playlists to uploaded videos.

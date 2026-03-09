@@ -1,0 +1,69 @@
+# TASK 4: Update test_youtube.py and test_youtube_v2.py for New Constructor
+
+## Changes Made
+
+### test_youtube.py (lines 28-35)
+✅ Fixed adapter fixture:
+- OLD: YouTubeBrowserAdapter(youtube_account, headless=True, delays=delays)
+- NEW: YouTubeBrowserAdapter(youtube_account, browser=Mock(), delays=delays)
+
+### test_youtube.py TestYouTubeBrowserAdapterInit (lines 38-56)
+✅ Removed test_init_stores_headless (lines 44-45)
+✅ Renamed test_init_browser_none → test_init_stores_browser
+  - OLD: assert adapter.browser is None
+  - NEW: assert adapter.browser is not None
+
+### test_youtube.py TestOpen (lines 101-123)
+✅ Completely rewritten:
+- Removed @patch decorators for sync_playwright and find_chrome
+- Removed browser launch logic (adapter already has mock browser from fixture)
+- New test: test_open_creates_context
+  - Verifies adapter.browser.new_context() is called with correct storage_state
+  - Verifies adapter.context is set to returned context
+
+### test_youtube.py TestClose (lines 126-161)
+✅ Completely rewritten:
+- Removed test_close_no_playwright (field no longer exists)
+- test_close_saves_storage_state:
+  - Removed mock_browser and mock_playwright setup
+  - Removed assertions for browser.close() and playwright.stop()
+  - Added assertion: adapter.browser.close.assert_not_called()
+- test_close_no_context:
+  - Simplified: just sets context=None and calls close()
+  - Removed browser and playwright mocking
+
+### test_youtube_v2.py (lines 25-32)
+✅ Fixed adapter fixture:
+- OLD: YouTubeBrowserAdapter(youtube_account, headless=True, delays=delays)
+- NEW: YouTubeBrowserAdapter(youtube_account, browser=MagicMock(), delays=delays)
+
+## Verification
+
+### Removed References
+- headless: 0 occurrences in both test files ✅
+- _playwright: 0 occurrences in test_youtube.py ✅
+
+### Test Results
+All 12 target tests PASS:
+- TestYouTubeBrowserAdapterInit: 4/4 ✅
+- TestOpen: 1/1 ✅
+- TestClose: 2/2 ✅
+- TestUploadV2: 5/5 ✅
+
+### Unaffected Tests
+All other tests in scope remain unchanged and passing:
+- TestRandomDelay: 2/2 ✅
+- TestCheckBotDetection: 2/2 ✅
+- TestCheckSessionExpired: 2/2 ✅
+- TestUpload: 5/5 ✅
+- test_video_uploader_protocol_accepts_description_kwarg: 1/1 ✅
+
+### Pre-existing Failure
+TestAssignPlaylist.test_assign_playlist_success was already failing before changes
+(verified by git stash test). NOT in scope of this task.
+
+## Summary
+✅ All required changes completed
+✅ All target tests passing
+✅ No regressions in other tests
+✅ Constructor signature fully updated

@@ -1,0 +1,10 @@
+Test results:
+    raise SelectorChangedError("Playlist search input not found")
+E   yt_recorder.domain.exceptions.SelectorChangedError: Playlist search input not found
+=========================== short test summary info ============================
+FAILED tests/test_youtube.py::TestAssignPlaylist::test_assign_playlist_success
+1 failed, 258 passed in 2.49s
+Core assertions:
+sync_playwright in youtube.py: 0
+_run_outside_event_loop in cli.py: 0
+ThreadPoolExecutor in cli.py: 0

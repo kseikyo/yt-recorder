@@ -1,0 +1,46 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.9, pytest-8.4.2, pluggy-1.6.0 -- /Users/lucassierota/Desktop/recordings/yt-recorder/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/lucassierota/Desktop/recordings/yt-recorder
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 27 items
+
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_account PASSED [  3%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_delays PASSED [  7%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_browser PASSED [ 11%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_context_none PASSED [ 14%]
+tests/test_youtube.py::TestRandomDelay::test_random_delay_applies_delay PASSED [ 18%]
+tests/test_youtube.py::TestRandomDelay::test_random_delay_unknown_action_type PASSED [ 22%]
+tests/test_youtube.py::TestCheckBotDetection::test_check_bot_detection_no_captcha PASSED [ 25%]
+tests/test_youtube.py::TestCheckBotDetection::test_check_bot_detection_captcha_found PASSED [ 29%]
+tests/test_youtube.py::TestCheckSessionExpired::test_check_session_expired_normal_url PASSED [ 33%]
+tests/test_youtube.py::TestCheckSessionExpired::test_check_session_expired_google_accounts_url PASSED [ 37%]
+tests/test_youtube.py::TestOpen::test_open_creates_context PASSED        [ 40%]
+tests/test_youtube.py::TestClose::test_close_saves_storage_state PASSED  [ 44%]
+tests/test_youtube.py::TestClose::test_close_no_context PASSED           [ 48%]
+tests/test_youtube.py::TestUpload::test_upload_no_context_raises_error PASSED [ 51%]
+tests/test_youtube.py::TestUpload::test_upload_session_expired PASSED    [ 55%]
+tests/test_youtube.py::TestUpload::test_upload_bot_detection PASSED      [ 59%]
+tests/test_youtube.py::TestUpload::test_upload_file_input_not_found PASSED [ 62%]
+tests/test_youtube.py::TestUpload::test_upload_success PASSED            [ 66%]
+tests/test_youtube.py::TestAssignPlaylist::test_assign_playlist_no_context_raises_error PASSED [ 70%]
+tests/test_youtube.py::TestAssignPlaylist::test_assign_playlist_session_expired PASSED [ 74%]
+tests/test_youtube.py::TestAssignPlaylist::test_assign_playlist_success FAILED [ 77%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_wait_for_function_done_result_succeeds PASSED [ 81%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_raises_video_too_long_error PASSED [ 85%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_raises_daily_limit_error PASSED [ 88%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_fills_description_when_non_empty PASSED [ 92%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_skips_description_when_empty PASSED [ 96%]
+tests/test_youtube_v2.py::test_video_uploader_protocol_accepts_description_kwarg PASSED [100%]
+
+=================================== FAILURES ===================================
+_______________ TestAssignPlaylist.test_assign_playlist_success ________________
+tests/test_youtube.py:297: in test_assign_playlist_success
+    result = adapter.assign_playlist("abc123", "my-playlist")
+src/yt_recorder/adapters/youtube.py:232: in assign_playlist
+    raise SelectorChangedError("Playlist search input not found")
+E   yt_recorder.domain.exceptions.SelectorChangedError: Playlist search input not found
+=========================== short test summary info ============================
+FAILED tests/test_youtube.py::TestAssignPlaylist::test_assign_playlist_success
+========================= 1 failed, 26 passed in 2.29s =========================

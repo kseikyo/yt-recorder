@@ -1,0 +1,3 @@
+        adapter_factory: Callable[[YouTubeAccount, Browser], YouTubeBrowserAdapter] | None = None,
+        self._factory = adapter_factory or (
+Success: no issues found in 1 source file

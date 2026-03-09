@@ -1,0 +1,45 @@
+# Task 2: playlist CLI command - Verification Results
+
+## Test 1: Help Output
+✓ PASS: uv run yt-recorder playlist --help
+- Shows all 4 options: --video-id, --name, --dry-run, --account
+- Shows DIRECTORY as optional argument
+- Docstring displays correctly
+
+## Test 2: Mutual Exclusivity - Directory + video-id
+✓ PASS: uv run yt-recorder playlist /tmp/test_recordings --video-id abc --name "test"
+- Error: "Provide either DIRECTORY or both --video-id and --name, not both"
+
+## Test 3: Validation - video-id without name
+✓ PASS: uv run yt-recorder playlist --video-id abc
+- Error: "--name required with --video-id"
+
+## Test 4: Validation - name without video-id
+✓ PASS: uv run yt-recorder playlist --name "test"
+- Error: "--video-id required with --name"
+
+## Test 5: Validation - No arguments
+✓ PASS: uv run yt-recorder playlist
+- Error: "Provide either DIRECTORY or both --video-id and --name"
+
+## Type Checking
+✓ PASS: uv run mypy --strict src/yt_recorder/cli.py
+- Success: no issues found in 1 source file
+
+## Code Quality
+✓ PASS: uv run ruff check src/yt_recorder/cli.py
+- All checks passed!
+
+✓ PASS: uv run ruff format --check src/yt_recorder/cli.py
+- 1 file already formatted
+
+## Implementation Details
+- Lazy imports inside function (not module-level)
+- click.echo() for all user output
+- sys.exit(1) for validation errors
+- try/finally for raid.close() resource cleanup
+- Progress callback pattern: on_progress(account_name, video_id, playlist_name, success)
+- Summary output with assigned/failed/skipped counts
+- Error list printing if errors present
+
+All verification tests PASSED.

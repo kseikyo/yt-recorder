@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock
+from typing import Any
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -11,6 +12,18 @@ from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
 class TestRaidAdapter:
     """Test suite for RaidAdapter."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     @pytest.fixture
     def accounts(self) -> list[YouTubeAccount]:
@@ -55,7 +68,7 @@ class TestRaidAdapter:
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
     ) -> None:
         raid = RaidAdapter(
-            accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
+            accounts, headless=True, delays={}, adapter_factory=lambda x, b: mock_adapter
         )
         raid.open()
 
@@ -65,7 +78,7 @@ class TestRaidAdapter:
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
     ) -> None:
         raid = RaidAdapter(
-            accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
+            accounts, headless=True, delays={}, adapter_factory=lambda x, b: mock_adapter
         )
         raid.open()
         raid.close()
@@ -76,7 +89,7 @@ class TestRaidAdapter:
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
     ) -> None:
         raid = RaidAdapter(
-            accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
+            accounts, headless=True, delays={}, adapter_factory=lambda x, b: mock_adapter
         )
         raid.open()
         results, _playlist_failures = raid.upload(
@@ -93,7 +106,7 @@ class TestRaidAdapter:
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
     ) -> None:
         raid = RaidAdapter(
-            accounts, headless=True, delays={}, adapter_factory=lambda x: mock_adapter
+            accounts, headless=True, delays={}, adapter_factory=lambda x, b: mock_adapter
         )
         raid.open()
         _results, _pf = raid.upload(Path("/tmp/test.mp4"), "Test Title", "test-playlist")
@@ -102,7 +115,7 @@ class TestRaidAdapter:
         assert mock_adapter.assign_playlist.call_count == 3
 
     def test_mirror_failure_returns_none(self, accounts: list[YouTubeAccount]) -> None:
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             adapter = Mock()
             adapter.open = Mock()
             adapter.close = Mock()
@@ -132,7 +145,7 @@ class TestRaidAdapter:
     def test_uploads_to_primary_first(self, accounts: list[YouTubeAccount]) -> None:
         call_order = []
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             adapter = Mock()
             adapter.open = Mock()
             adapter.close = Mock()
@@ -158,7 +171,7 @@ class TestRaidAdapter:
         assert call_order[0] == "primary"
 
     def test_playlist_failure_counted(self, accounts: list[YouTubeAccount]) -> None:
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             adapter = Mock()
             adapter.open = Mock()
             adapter.close = Mock()
@@ -182,7 +195,7 @@ class TestRaidAdapter:
         assert all(r is not None for r in results.values())
 
     def test_playlist_failure_primary_only(self, accounts: list[YouTubeAccount]) -> None:
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             adapter = Mock()
             adapter.open = Mock()
             adapter.close = Mock()

@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.9, pytest-8.4.2, pluggy-1.6.0 -- /Users/lucassierota/Desktop/recordings/yt-recorder/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/lucassierota/Desktop/recordings/yt-recorder
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 12 items
+
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_account PASSED [  8%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_delays PASSED [ 16%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_stores_browser PASSED [ 25%]
+tests/test_youtube.py::TestYouTubeBrowserAdapterInit::test_init_context_none PASSED [ 33%]
+tests/test_youtube.py::TestOpen::test_open_creates_context PASSED        [ 41%]
+tests/test_youtube.py::TestClose::test_close_saves_storage_state PASSED  [ 50%]
+tests/test_youtube.py::TestClose::test_close_no_context PASSED           [ 58%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_wait_for_function_done_result_succeeds PASSED [ 66%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_raises_video_too_long_error PASSED [ 75%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_raises_daily_limit_error PASSED [ 83%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_fills_description_when_non_empty PASSED [ 91%]
+tests/test_youtube_v2.py::TestUploadV2::test_upload_skips_description_when_empty PASSED [100%]
+
+============================== 12 passed in 0.10s ==============================

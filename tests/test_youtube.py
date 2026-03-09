@@ -32,7 +32,8 @@ def adapter(youtube_account: YouTubeAccount) -> YouTubeBrowserAdapter:
         "nav": (0.1, 0.2),
         "post": (0.1, 0.2),
     }
-    return YouTubeBrowserAdapter(youtube_account, headless=True, delays=delays)
+    mock_browser = Mock()
+    return YouTubeBrowserAdapter(youtube_account, browser=mock_browser, delays=delays)
 
 
 class TestYouTubeBrowserAdapterInit:
@@ -41,16 +42,13 @@ class TestYouTubeBrowserAdapterInit:
     ) -> None:
         assert adapter.account == youtube_account
 
-    def test_init_stores_headless(self, adapter: YouTubeBrowserAdapter) -> None:
-        assert adapter.headless is True
-
     def test_init_stores_delays(self, adapter: YouTubeBrowserAdapter) -> None:
         assert "field" in adapter.delays
         assert "nav" in adapter.delays
         assert "post" in adapter.delays
 
-    def test_init_browser_none(self, adapter: YouTubeBrowserAdapter) -> None:
-        assert adapter.browser is None
+    def test_init_stores_browser(self, adapter: YouTubeBrowserAdapter) -> None:
+        assert adapter.browser is not None
 
     def test_init_context_none(self, adapter: YouTubeBrowserAdapter) -> None:
         assert adapter.context is None
@@ -99,66 +97,30 @@ class TestCheckSessionExpired:
 
 
 class TestOpen:
-    @patch("yt_recorder.adapters.youtube.find_chrome")
-    @patch("yt_recorder.adapters.youtube.sync_playwright")
-    def test_open_launches_browser(
-        self, mock_sync_playwright: Mock, mock_find_chrome: Mock, adapter: YouTubeBrowserAdapter
-    ) -> None:
-        mock_playwright = Mock()
-        mock_browser = Mock()
+    def test_open_creates_context(self, adapter: YouTubeBrowserAdapter) -> None:
         mock_context = Mock()
-
-        mock_chrome_path = mock_find_chrome.return_value
-        mock_sync_playwright.return_value.start.return_value = mock_playwright
-        mock_playwright.chromium.launch.return_value = mock_browser
-        mock_browser.new_context.return_value = mock_context
-
+        adapter.browser.new_context.return_value = mock_context
         adapter.open()
-
-        assert adapter.browser == mock_browser
         assert adapter.context == mock_context
-        assert adapter._playwright == mock_playwright
-        mock_playwright.chromium.launch.assert_called_once_with(
-            headless=True, executable_path=mock_chrome_path
+        adapter.browser.new_context.assert_called_once_with(
+            storage_state=str(adapter.account.storage_state)
         )
 
 
 class TestClose:
     def test_close_saves_storage_state(self, adapter: YouTubeBrowserAdapter) -> None:
         mock_context = Mock()
-        mock_browser = Mock()
-        mock_playwright = Mock()
-
         adapter.context = mock_context
-        adapter.browser = mock_browser
-        adapter._playwright = mock_playwright
-
         with patch("os.chmod"):
             adapter.close()
-
         mock_context.storage_state.assert_called_once()
         mock_context.close.assert_called_once()
-        mock_browser.close.assert_called_once()
-        mock_playwright.stop.assert_called_once()
+        # Should NOT call browser.close() — RaidAdapter owns browser
+        adapter.browser.close.assert_not_called()
 
     def test_close_no_context(self, adapter: YouTubeBrowserAdapter) -> None:
         adapter.context = None
-        adapter.browser = Mock()
-        mock_playwright = Mock()
-        adapter._playwright = mock_playwright
-        adapter.close()
-        adapter.browser.close.assert_called_once()
-        mock_playwright.stop.assert_called_once()
-
-    def test_close_no_playwright(self, adapter: YouTubeBrowserAdapter) -> None:
-        adapter.context = Mock()
-        adapter.browser = Mock()
-        adapter._playwright = None
-        with patch("os.chmod"):
-            adapter.close()
-        adapter.context.storage_state.assert_called_once()
-        adapter.context.close.assert_called_once()
-        adapter.browser.close.assert_called_once()
+        adapter.close()  # should not raise
 
 
 class TestUpload:

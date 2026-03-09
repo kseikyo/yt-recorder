@@ -1,0 +1,5 @@
+class PlaylistReport:
+    """Report of playlist assignment operation."""
+
+    assigned: int = 0
+    failed: int = 0

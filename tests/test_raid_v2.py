@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock
+from typing import Any
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -46,11 +47,23 @@ def make_mock_adapter(account_name: str = "test") -> Mock:
 
 
 class TestDescriptionPassthrough:
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
+
     def test_description_passed_to_primary(self) -> None:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -67,7 +80,7 @@ class TestDescriptionPassthrough:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -84,7 +97,7 @@ class TestDescriptionPassthrough:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -99,11 +112,23 @@ class TestDescriptionPassthrough:
 
 
 class TestUploadToAccount:
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
+
     def test_returns_upload_result(self) -> None:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -122,7 +147,7 @@ class TestUploadToAccount:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -136,10 +161,22 @@ class TestUploadToAccount:
 
 
 class TestVideoTooLongError:
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
+
     def test_propagates_from_primary(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             if acct.role == "primary":
                 m.upload = Mock(side_effect=VideoTooLongError("too long"))
@@ -154,7 +191,7 @@ class TestVideoTooLongError:
     def test_propagates_from_mirror(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             if acct.role == "mirror":
                 m.upload = Mock(side_effect=VideoTooLongError("too long"))
@@ -169,7 +206,7 @@ class TestVideoTooLongError:
     def test_propagates_from_upload_to_account(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             m.upload = Mock(side_effect=VideoTooLongError("too long"))
             return m
@@ -182,10 +219,22 @@ class TestVideoTooLongError:
 
 
 class TestDailyLimitError:
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
+
     def test_mirror_daily_limit_sets_none(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             if acct.role == "mirror":
                 m.upload = Mock(side_effect=DailyLimitError("limit reached"))
@@ -201,7 +250,7 @@ class TestDailyLimitError:
     def test_primary_daily_limit_propagates(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             if acct.role == "primary":
                 m.upload = Mock(side_effect=DailyLimitError("limit reached"))
@@ -216,7 +265,7 @@ class TestDailyLimitError:
     def test_upload_to_account_daily_limit_propagates(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             m.upload = Mock(side_effect=DailyLimitError("limit reached"))
             return m
@@ -229,11 +278,23 @@ class TestDailyLimitError:
 
 
 class TestAssignPlaylistToAccount:
+    @pytest.fixture(autouse=True)
+    def _mock_playwright(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        mock_pw = Mock()
+        mock_playwright_inst = Mock()
+        mock_browser = Mock()
+        mock_pw.return_value.start.return_value = mock_playwright_inst
+        mock_playwright_inst.chromium.launch.return_value = mock_browser
+        monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
+
     def test_delegates_to_adapter(self) -> None:
         accounts = make_accounts()
         adapters: dict[str, Mock] = {}
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             adapters[acct.name] = m
             return m
@@ -249,7 +310,7 @@ class TestAssignPlaylistToAccount:
     def test_returns_false_on_failure(self) -> None:
         accounts = make_accounts()
 
-        def factory(acct: YouTubeAccount) -> Mock:
+        def factory(acct: YouTubeAccount, browser: Any) -> Mock:
             m = make_mock_adapter(acct.name)
             m.assign_playlist = Mock(return_value=False)
             return m

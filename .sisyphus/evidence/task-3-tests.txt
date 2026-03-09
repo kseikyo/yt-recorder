@@ -1,0 +1,62 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.9, pytest-8.4.2, pluggy-1.6.0 -- /Users/lucassierota/Desktop/recordings/yt-recorder/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/lucassierota/Desktop/recordings/yt-recorder
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 12 items
+
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_success PASSED [  8%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_dry_run PASSED [ 16%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_skips_missing_video_id PASSED [ 25%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_skips_empty_playlist PASSED [ 33%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_single_account PASSED [ 41%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_failure_counted PASSED [ 50%]
+tests/test_pipeline.py::TestAssignPlaylists::test_assign_playlists_exception_handling PASSED [ 58%]
+tests/test_cli.py::TestPlaylistCommand::test_playlist_help PASSED        [ 66%]
+tests/test_cli.py::TestPlaylistCommand::test_playlist_dry_run PASSED     [ 75%]
+tests/test_cli.py::TestPlaylistCommand::test_playlist_single_video PASSED [ 83%]
+tests/test_cli.py::TestPlaylistCommand::test_playlist_mutual_exclusivity PASSED [ 91%]
+tests/test_cli.py::TestPlaylistCommand::test_playlist_missing_name PASSED [100%]
+
+============================== 12 passed in 0.30s ==============================
+........................................................................ [ 37%]
+........................................................................ [ 75%]
+...............................................                          [100%]
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.9.9-final-0 ________________
+
+Name                                      Stmts   Miss  Cover
+-------------------------------------------------------------
+src/yt_recorder/__init__.py                   1      0   100%
+src/yt_recorder/adapters/__init__.py          0      0   100%
+src/yt_recorder/adapters/raid.py             58      5    91%
+src/yt_recorder/adapters/registry.py        198     31    84%
+src/yt_recorder/adapters/scanner.py          41      2    95%
+src/yt_recorder/adapters/transcriber.py      59      3    95%
+src/yt_recorder/adapters/youtube.py         180     31    83%
+src/yt_recorder/cli.py                      390    217    44%
+src/yt_recorder/config.py                    66     48    27%
+src/yt_recorder/constants.py                 18      0   100%
+src/yt_recorder/domain/__init__.py            0      0   100%
+src/yt_recorder/domain/exceptions.py         14      0   100%
+src/yt_recorder/domain/formatters.py         76      6    92%
+src/yt_recorder/domain/models.py             69      0   100%
+src/yt_recorder/domain/protocols.py          20      0   100%
+src/yt_recorder/pipeline.py                 244     42    83%
+src/yt_recorder/utils.py                     30     15    50%
+tests/__init__.py                             0      0   100%
+tests/conftest.py                             0      0   100%
+tests/test_cli.py                           193      0   100%
+tests/test_formatters.py                    162      0   100%
+tests/test_pipeline.py                      355      0   100%
+tests/test_raid.py                          110      0   100%
+tests/test_registry.py                      206      0   100%
+tests/test_scanner.py                       139      0   100%
+tests/test_transcriber.py                   183      0   100%
+tests/test_utils.py                          33      0   100%
+tests/test_youtube.py                       246      8    97%
+-------------------------------------------------------------
+TOTAL                                      3091    408    87%
+191 passed in 3.32s
+All checks passed!

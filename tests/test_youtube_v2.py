@@ -29,7 +29,8 @@ def adapter(youtube_account: YouTubeAccount) -> YouTubeBrowserAdapter:
         "nav": (0.1, 0.2),
         "post": (0.1, 0.2),
     }
-    return YouTubeBrowserAdapter(youtube_account, headless=True, delays=delays)
+    mock_browser = MagicMock()
+    return YouTubeBrowserAdapter(youtube_account, browser=mock_browser, delays=delays)
 
 
 def build_upload_page(wait_result: dict[str, object]) -> tuple[MagicMock, MagicMock, MagicMock]:
@@ -130,9 +131,7 @@ class TestUploadV2:
 
         mock_done_btn.click.assert_not_called()
 
-    def test_upload_fills_description_when_non_empty(
-        self, adapter: YouTubeBrowserAdapter
-    ) -> None:
+    def test_upload_fills_description_when_non_empty(self, adapter: YouTubeBrowserAdapter) -> None:
         mock_context = MagicMock()
         mock_page, mock_description_box, _ = build_upload_page({"done": True})
         mock_context.new_page.return_value = mock_page

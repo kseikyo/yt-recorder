@@ -1,0 +1,3 @@
+Success: no issues found in 17 source files
+All checks passed!
+17 files already formatted

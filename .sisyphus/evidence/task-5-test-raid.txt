@@ -1,0 +1,33 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.9, pytest-8.4.2, pluggy-1.6.0 -- /Users/lucassierota/Desktop/recordings/yt-recorder/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/lucassierota/Desktop/recordings/yt-recorder
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 23 items
+
+tests/test_raid.py::TestRaidAdapter::test_open_launches_all_browsers PASSED [  4%]
+tests/test_raid.py::TestRaidAdapter::test_close_closes_all_browsers PASSED [  8%]
+tests/test_raid.py::TestRaidAdapter::test_upload_returns_all_results PASSED [ 13%]
+tests/test_raid.py::TestRaidAdapter::test_upload_calls_assign_playlist PASSED [ 17%]
+tests/test_raid.py::TestRaidAdapter::test_mirror_failure_returns_none PASSED [ 21%]
+tests/test_raid.py::TestRaidAdapter::test_uploads_to_primary_first PASSED [ 26%]
+tests/test_raid.py::TestRaidAdapter::test_playlist_failure_counted PASSED [ 30%]
+tests/test_raid.py::TestRaidAdapter::test_playlist_failure_primary_only PASSED [ 34%]
+tests/test_raid.py::TestRaidAdapter::test_empty_accounts_raises_error PASSED [ 39%]
+tests/test_raid.py::TestRaidAdapter::test_no_primary_account_raises_error PASSED [ 43%]
+tests/test_raid_v2.py::TestDescriptionPassthrough::test_description_passed_to_primary PASSED [ 47%]
+tests/test_raid_v2.py::TestDescriptionPassthrough::test_description_passed_to_mirrors PASSED [ 52%]
+tests/test_raid_v2.py::TestDescriptionPassthrough::test_empty_description_default PASSED [ 56%]
+tests/test_raid_v2.py::TestUploadToAccount::test_returns_upload_result PASSED [ 60%]
+tests/test_raid_v2.py::TestUploadToAccount::test_upload_to_mirror_account PASSED [ 65%]
+tests/test_raid_v2.py::TestVideoTooLongError::test_propagates_from_primary PASSED [ 69%]
+tests/test_raid_v2.py::TestVideoTooLongError::test_propagates_from_mirror PASSED [ 73%]
+tests/test_raid_v2.py::TestVideoTooLongError::test_propagates_from_upload_to_account PASSED [ 78%]
+tests/test_raid_v2.py::TestDailyLimitError::test_mirror_daily_limit_sets_none PASSED [ 82%]
+tests/test_raid_v2.py::TestDailyLimitError::test_primary_daily_limit_propagates PASSED [ 86%]
+tests/test_raid_v2.py::TestDailyLimitError::test_upload_to_account_daily_limit_propagates PASSED [ 91%]
+tests/test_raid_v2.py::TestAssignPlaylistToAccount::test_delegates_to_adapter PASSED [ 95%]
+tests/test_raid_v2.py::TestAssignPlaylistToAccount::test_returns_false_on_failure PASSED [100%]
+
+============================== 23 passed in 0.08s ==============================
