@@ -9,6 +9,7 @@ from playwright.sync_api import Browser, Playwright, sync_playwright
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import DailyLimitError, VideoTooLongError
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
+from yt_recorder.utils import find_chrome
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,10 @@ class RaidAdapter:
     def open(self) -> None:
         """Launch browsers for all accounts once."""
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(headless=self.headless)
+        chrome_path = find_chrome()
+        self._browser = self._playwright.chromium.launch(
+            headless=self.headless, executable_path=chrome_path
+        )
         for acct in [self.primary, *self.mirrors]:
             adapter = self._factory(acct, self._browser)
             adapter.open()

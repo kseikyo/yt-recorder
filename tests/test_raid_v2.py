@@ -55,6 +55,9 @@ class TestDescriptionPassthrough:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     def test_description_passed_to_primary(self) -> None:
         accounts = make_accounts()
@@ -117,6 +120,9 @@ class TestUploadToAccount:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     def test_returns_upload_result(self) -> None:
         accounts = make_accounts()
@@ -163,6 +169,9 @@ class TestVideoTooLongError:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     def test_propagates_from_primary(self) -> None:
         accounts = make_accounts()
@@ -218,6 +227,9 @@ class TestDailyLimitError:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     def test_mirror_daily_limit_sets_none(self) -> None:
         accounts = make_accounts()
@@ -274,6 +286,9 @@ class TestAssignPlaylistToAccount:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
+        monkeypatch.setattr(
+            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
+        )
 
     def test_delegates_to_adapter(self) -> None:
         accounts = make_accounts()

@@ -23,7 +23,7 @@ class Config:
             "post": (2.0, 5.0),
         }
     )
-    headless: bool = True
+    headless: bool = False
     transcript_language: str = "en"
     transcript_delay: float = 1.0
     split_threshold_secs: float = 3420.0
@@ -153,7 +153,7 @@ max_depth = 1
 limit = 5
 delay_min = 1.0
 delay_max = 3.0
-headless = true
+headless = false
 # split_threshold_secs = 3420  # 57 minutes — adjust if your account has a different limit
 
 [transcript]
