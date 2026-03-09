@@ -23,6 +23,7 @@ from yt_recorder.domain.exceptions import (
     SessionExpiredError,
     UnsupportedBrowserError,
     UploadTimeoutError,
+    VerificationRequiredError,
     VideoTooLongError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
@@ -61,6 +62,12 @@ class YouTubeBrowserAdapter:
                 "YouTube rejected browser as unsupported. Run: playwright install chromium"
             )
 
+    def _check_verification_required(self, page: Page) -> None:
+        if page.query_selector('text="Verify it\'s you"'):
+            raise VerificationRequiredError(
+                "Google requires identity verification. Run: yt-recorder setup --account <name>"
+            )
+
     def _check_session_expired(self, page: Page) -> None:
         if "accounts.google.com" in page.url:
             raise SessionExpiredError("Session expired, redirected to login")
@@ -69,7 +76,7 @@ class YouTubeBrowserAdapter:
         try:
             page.wait_for_selector(constants.DIALOG_SCRIM, state="hidden", timeout=timeout)
         except PlaywrightTimeoutError:
-            pass
+            self._check_verification_required(page)
 
     def open(self) -> None:
         self.context = self.browser.new_context(storage_state=str(self.account.storage_state))
@@ -90,6 +97,7 @@ class YouTubeBrowserAdapter:
             self._check_session_expired(page)
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
+            self._check_verification_required(page)
 
             self._random_delay("nav")
 
@@ -220,6 +228,7 @@ class YouTubeBrowserAdapter:
             self._check_session_expired(page)
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
+            self._check_verification_required(page)
 
             self._random_delay("nav")
 

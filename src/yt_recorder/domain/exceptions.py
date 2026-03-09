@@ -45,6 +45,10 @@ class BotDetectionError(YouTubeError):
     """CAPTCHA or challenge page detected."""
 
 
+class VerificationRequiredError(YouTubeError):
+    """Google requires identity verification (e.g. 'Verify it's you' dialog)."""
+
+
 class UnsupportedBrowserError(YouTubeError):
     """YouTube rejected the browser as unsupported or outdated."""
 
