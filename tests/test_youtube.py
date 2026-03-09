@@ -12,6 +12,7 @@ from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import (
     BotDetectionError,
     ChannelCreationRequiredError,
+    PhoneVerificationRequiredError,
     SelectorChangedError,
     SessionExpiredError,
     UnsupportedBrowserError,
@@ -137,6 +138,38 @@ class TestCheckChannelCreationRequired:
 
         with pytest.raises(ChannelCreationRequiredError):
             adapter._check_channel_creation_required(mock_page)
+
+
+class TestCheckPhoneVerificationRequired:
+    def test_check_phone_verification_required_title_found(
+        self, adapter: YouTubeBrowserAdapter
+    ) -> None:
+        mock_page = Mock()
+
+        def side_effect(selector: str) -> Mock | None:
+            if selector == constants.PHONE_VERIFY_MODAL_TITLE:
+                return Mock()
+            return None
+
+        mock_page.query_selector.side_effect = side_effect
+
+        with pytest.raises(PhoneVerificationRequiredError):
+            adapter._check_phone_verification_required(mock_page)
+
+    def test_check_phone_verification_required_body_found(
+        self, adapter: YouTubeBrowserAdapter
+    ) -> None:
+        mock_page = Mock()
+
+        def side_effect(selector: str) -> Mock | None:
+            if selector == constants.PHONE_VERIFY_MODAL_BODY:
+                return Mock()
+            return None
+
+        mock_page.query_selector.side_effect = side_effect
+
+        with pytest.raises(PhoneVerificationRequiredError):
+            adapter._check_phone_verification_required(mock_page)
 
 
 class TestDismissWarmWelcome:
@@ -352,6 +385,49 @@ class TestUpload:
 
         with pytest.raises(UnsupportedBrowserError):
             adapter.upload(Path("/tmp/test.mp4"), "Test Title")
+
+    def test_upload_title_timeout_with_phone_modal_raises_typed_error(
+        self, adapter: YouTubeBrowserAdapter
+    ) -> None:
+        mock_context = Mock()
+        mock_page = Mock()
+        mock_page.url = "https://www.youtube.com/upload"
+
+        modal_title_calls = 0
+
+        def query_selector_side_effect(selector: str) -> Mock | None:
+            nonlocal modal_title_calls
+            if selector == constants.PHONE_VERIFY_MODAL_TITLE:
+                modal_title_calls += 1
+                return Mock() if modal_title_calls > 1 else None
+            if selector in {
+                constants.CAPTCHA_INDICATOR,
+                constants.UNSUPPORTED_BROWSER_INDICATOR,
+                constants.PHONE_VERIFY_MODAL_BODY,
+                constants.CHANNEL_IDENTITY_DIALOG,
+                constants.CHANNEL_CREATE_BUTTON,
+                constants.CHANNEL_APPEAR_HEADING,
+                'text="Verify it\'s you"',
+            }:
+                return None
+            return None
+
+        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
+            if selector == constants.UPLOAD_FILE_PICKER:
+                return Mock()
+            if selector == constants.FILE_INPUT:
+                return Mock()
+            if selector == constants.TITLE_INPUT:
+                raise PlaywrightTimeoutError("timeout")
+            return None
+
+        mock_page.query_selector.side_effect = query_selector_side_effect
+        mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
+        mock_context.new_page.return_value = mock_page
+        adapter.context = mock_context
+
+        with pytest.raises(PhoneVerificationRequiredError):
+            adapter.upload(Path("/tmp/video.mp4"), "Test Title")
 
 
 class TestAssignPlaylist:
