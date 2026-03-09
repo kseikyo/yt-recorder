@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -87,9 +87,9 @@ class TestRaidAdapter:
 
         assert mock_adapter.close.call_count == 3
         assert browser is not None
-        browser.close.assert_called_once()  # type: ignore[attr-defined]
+        cast(Mock, browser).close.assert_called_once()
         assert playwright is not None
-        playwright.stop.assert_called_once()  # type: ignore[attr-defined]
+        cast(Mock, playwright).stop.assert_called_once()
 
     def test_upload_returns_all_results(
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
