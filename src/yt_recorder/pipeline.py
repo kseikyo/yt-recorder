@@ -14,6 +14,7 @@ from yt_recorder.config import Config, load_config, save_detected_limit
 from yt_recorder.domain.exceptions import (
     ChannelCreationRequiredError,
     DailyLimitError,
+    PhoneVerificationRequiredError,
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
     TranscriptUnavailableError,
@@ -119,7 +120,7 @@ class RecordingPipeline:
         if not files_to_process and not retry_failed:
             return SyncReport(total_registered=len(entries))
 
-        from yt_recorder.adapters.splitter import VideoSplitter
+        from yt_recorder.adapters.splitter import TIER_15MIN, VideoSplitter
 
         splitter = VideoSplitter()
         self.raid.open()
@@ -134,14 +135,31 @@ class RecordingPipeline:
                 try:
                     title = title_from_filename(path.name)
                     file_key = str(path.relative_to(directory))
+                    results: dict[str, UploadResult | None]
 
                     if single_account:
                         adapter = self.raid.get_adapter(single_account)
-                        result = adapter.upload(path, title)
-                        results: dict[str, UploadResult | None] = {single_account: result}
-                        pl_ok = adapter.assign_playlist(result.video_id, playlist)
-                        if not pl_ok:
-                            playlist_failed += 1
+                        try:
+                            result = adapter.upload(path, title)
+                            results = {single_account: result}
+                            pl_ok = adapter.assign_playlist(result.video_id, playlist)
+                            if not pl_ok:
+                                playlist_failed += 1
+                        except PhoneVerificationRequiredError:
+                            parts = splitter.split(path, TIER_15MIN)
+                            self._upload_parts_to_account(
+                                raid=self.raid,
+                                registry=self.registry,
+                                account_name=single_account,
+                                parts=parts,
+                                base_title=title,
+                                playlist=playlist,
+                                original_path=path,
+                                directory=directory,
+                            )
+                            config_path = Config.default_config_dir() / "config.toml"
+                            save_detected_limit(config_path, single_account, TIER_15MIN)
+                            results = {single_account: None}
                     else:
                         if not isinstance(getattr(self.raid, "mirrors", None), list):
                             results, pf = self.raid.upload(path, title, playlist)
@@ -215,6 +233,20 @@ class RecordingPipeline:
                                         save_detected_limit(
                                             config_path, account_name, detected_limit
                                         )
+                                except PhoneVerificationRequiredError:
+                                    parts = splitter.split(path, TIER_15MIN)
+                                    self._upload_parts_to_account(
+                                        raid=self.raid,
+                                        registry=self.registry,
+                                        account_name=account_name,
+                                        parts=parts,
+                                        base_title=title,
+                                        playlist=playlist,
+                                        original_path=path,
+                                        directory=directory,
+                                    )
+                                    config_path = Config.default_config_dir() / "config.toml"
+                                    save_detected_limit(config_path, account_name, TIER_15MIN)
                                 except DailyLimitError:
                                     logger.warning("Daily limit hit for %s, stopping", account_name)
                                     stop_all_uploads = True
