@@ -20,6 +20,7 @@ from yt_recorder.domain.exceptions import (
     BotDetectionError,
     ChannelCreationRequiredError,
     DailyLimitError,
+    PhoneVerificationRequiredError,
     SelectorChangedError,
     SessionExpiredError,
     UnsupportedBrowserError,
@@ -85,6 +86,12 @@ class YouTubeBrowserAdapter:
                 "Create YouTube channel manually in YouTube/Studio, then rerun: "
                 "yt-recorder setup --account <name>"
             )
+
+    def _check_phone_verification_required(self, page: Page) -> None:
+        if page.query_selector(constants.PHONE_VERIFY_MODAL_TITLE):
+            raise PhoneVerificationRequiredError()
+        if page.query_selector(constants.PHONE_VERIFY_MODAL_BODY):
+            raise PhoneVerificationRequiredError()
 
     def _dismiss_warm_welcome(self, page: Page) -> None:
         dialog = page.query_selector(constants.WARM_WELCOME_DIALOG)
@@ -237,10 +244,15 @@ class YouTubeBrowserAdapter:
             if not file_input:
                 raise SelectorChangedError("File input selector not found")
             file_input.set_input_files(str(path))
+            self._check_phone_verification_required(page)
 
             self._random_delay("field")
 
-            page.wait_for_selector(constants.TITLE_INPUT, timeout=10000)
+            try:
+                page.wait_for_selector(constants.TITLE_INPUT, timeout=10000)
+            except PlaywrightTimeoutError as e:
+                self._check_phone_verification_required(page)
+                raise SelectorChangedError("Title input selector not found") from e
             title_input = page.query_selector(constants.TITLE_INPUT)
             if not title_input:
                 raise SelectorChangedError("Title input selector not found")

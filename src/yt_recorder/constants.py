@@ -24,6 +24,9 @@ WARM_WELCOME_PRIMARY_BUTTON = "ytcp-warm-welcome-dialog ytcp-button"
 CHANNEL_CREATE_BUTTON = "#create-channel-button"
 CHANNEL_IDENTITY_DIALOG = "ytcp-identity-config-dialog"
 CHANNEL_APPEAR_HEADING = 'text="How you\'ll appear"'
+PHONE_VERIFY_MODAL_TITLE = 'text="Unlock more on YouTube"'
+PHONE_VERIFY_MODAL_BODY = 'text="verify your phone number"'
+PHONE_VERIFY_BUTTON = 'ytcp-button:has-text("Verify")'
 
 # Video URL extraction
 VIDEO_URL_ELEMENT = "span.video-url-fadeable a"

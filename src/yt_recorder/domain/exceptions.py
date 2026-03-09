@@ -49,6 +49,13 @@ class VerificationRequiredError(YouTubeError):
     """Google requires identity verification (e.g. 'Verify it's you' dialog)."""
 
 
+class PhoneVerificationRequiredError(YouTubeError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Upload >15 minutes requires phone verification; verify once, or tool will split"
+        )
+
+
 class ChannelCreationRequiredError(YouTubeError):
     pass
 
