@@ -49,6 +49,10 @@ class VerificationRequiredError(YouTubeError):
     """Google requires identity verification (e.g. 'Verify it's you' dialog)."""
 
 
+class ChannelCreationRequiredError(YouTubeError):
+    pass
+
+
 class UnsupportedBrowserError(YouTubeError):
     """YouTube rejected the browser as unsupported or outdated."""
 

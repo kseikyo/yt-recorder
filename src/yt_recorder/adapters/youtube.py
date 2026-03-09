@@ -18,6 +18,7 @@ from playwright.sync_api import (
 from yt_recorder import constants
 from yt_recorder.domain.exceptions import (
     BotDetectionError,
+    ChannelCreationRequiredError,
     DailyLimitError,
     SelectorChangedError,
     SessionExpiredError,
@@ -68,6 +69,35 @@ class YouTubeBrowserAdapter:
                 "Google requires identity verification. Run: yt-recorder setup --account <name>"
             )
 
+    def _check_channel_creation_required(self, page: Page) -> None:
+        if page.query_selector(constants.CHANNEL_IDENTITY_DIALOG):
+            raise ChannelCreationRequiredError(
+                "Create YouTube channel manually in YouTube/Studio, then rerun: "
+                "yt-recorder setup --account <name>"
+            )
+        if page.query_selector(constants.CHANNEL_CREATE_BUTTON):
+            raise ChannelCreationRequiredError(
+                "Create YouTube channel manually in YouTube/Studio, then rerun: "
+                "yt-recorder setup --account <name>"
+            )
+        if page.query_selector(constants.CHANNEL_APPEAR_HEADING):
+            raise ChannelCreationRequiredError(
+                "Create YouTube channel manually in YouTube/Studio, then rerun: "
+                "yt-recorder setup --account <name>"
+            )
+
+    def _dismiss_warm_welcome(self, page: Page) -> None:
+        dialog = page.query_selector(constants.WARM_WELCOME_DIALOG)
+        if not dialog:
+            return
+        primary = page.query_selector(constants.WARM_WELCOME_PRIMARY_BUTTON)
+        if primary:
+            primary.click()
+        else:
+            page.keyboard.press("Escape")
+        page.wait_for_selector(constants.WARM_WELCOME_DIALOG, state="hidden", timeout=5000)
+        self._wait_for_scrim_dismissed(page)
+
     def _check_session_expired(self, page: Page) -> None:
         if "accounts.google.com" in page.url:
             raise SessionExpiredError("Session expired, redirected to login")
@@ -77,6 +107,101 @@ class YouTubeBrowserAdapter:
             page.wait_for_selector(constants.DIALOG_SCRIM, state="hidden", timeout=timeout)
         except PlaywrightTimeoutError:
             self._check_verification_required(page)
+
+    def _wait_click_unblocked(self, page: Page, target_selector: str, timeout_ms: int) -> None:
+        script = f"""() => {{
+                const selector = {target_selector!r};
+                const target = document.querySelector(selector);
+                if (!target) return false;
+                const box = target.getBoundingClientRect();
+                if (box.width <= 0 || box.height <= 0) return false;
+                const x = box.left + (box.width / 2);
+                const y = box.top + (box.height / 2);
+                const hit = document.elementFromPoint(x, y);
+                if (!hit) return false;
+                const disabled = target.getAttribute('aria-disabled') === 'true' || target.hasAttribute('disabled');
+                return !disabled && (hit === target || target.contains(hit) || hit.closest(selector) === target);
+            }}"""
+        page.wait_for_function(
+            script,
+            timeout=timeout_ms,
+        )
+
+    def _is_click_ready(self, page: Page, selector: str) -> bool:
+        try:
+            self._wait_click_unblocked(page, selector, timeout_ms=1500)
+        except PlaywrightTimeoutError:
+            return False
+        return True
+
+    def _capture_upload_step(self, page: Page) -> str | None:
+        dialog = page.query_selector(constants.UPLOAD_DIALOG)
+        if not dialog:
+            return None
+        return dialog.get_attribute("workflow-step")
+
+    def _assert_upload_step_advanced(
+        self, page: Page, previous_step: str | None, timeout_ms: int
+    ) -> None:
+        if previous_step:
+            script = f"""() => {{
+                    const prevStep = {previous_step!r};
+                    const dialog = document.querySelector('ytcp-uploads-dialog');
+                    if (!dialog) return true;
+                    const current = dialog.getAttribute('workflow-step');
+                    return current !== prevStep;
+                }}"""
+            page.wait_for_function(
+                script,
+                timeout=timeout_ms,
+            )
+            return
+        page.wait_for_function(
+            """() => {
+                const selected = document.querySelector('tp-yt-paper-tab[aria-selected="true"]');
+                return !!selected;
+            }""",
+            timeout=timeout_ms,
+        )
+
+    def _safe_click(
+        self,
+        page: Page,
+        selector: str,
+        timeout_ms: int,
+        allow_force: bool = False,
+    ) -> None:
+        try:
+            target = page.wait_for_selector(selector, timeout=timeout_ms)
+        except PlaywrightTimeoutError as e:
+            raise SelectorChangedError(f"Selector not found: {selector}") from e
+        if not target:
+            raise SelectorChangedError(f"Selector not found: {selector}")
+
+        self._dismiss_warm_welcome(page)
+        self._wait_for_scrim_dismissed(page, timeout=timeout_ms)
+        if selector == constants.NEXT_BUTTON:
+            self._wait_click_unblocked(page, selector, timeout_ms=timeout_ms)
+            previous_step = self._capture_upload_step(page)
+        else:
+            previous_step = None
+
+        try:
+            target.click()
+        except Exception:
+            self._dismiss_warm_welcome(page)
+            self._wait_for_scrim_dismissed(page, timeout=timeout_ms)
+            if selector == constants.NEXT_BUTTON:
+                self._wait_click_unblocked(page, selector, timeout_ms=timeout_ms)
+            if not allow_force or not self._is_click_ready(page, selector):
+                raise
+            retry_target = page.wait_for_selector(selector, timeout=min(timeout_ms, 2000))
+            if not retry_target:
+                raise SelectorChangedError(f"Selector not found: {selector}") from None
+            retry_target.click(force=True)
+
+        if selector == constants.NEXT_BUTTON:
+            self._assert_upload_step_advanced(page, previous_step, timeout_ms=timeout_ms)
 
     def open(self) -> None:
         self.context = self.browser.new_context(storage_state=str(self.account.storage_state))
@@ -98,6 +223,7 @@ class YouTubeBrowserAdapter:
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
             self._check_verification_required(page)
+            self._check_channel_creation_required(page)
 
             self._random_delay("nav")
 
@@ -136,10 +262,7 @@ class YouTubeBrowserAdapter:
 
             self._wait_for_scrim_dismissed(page)
             for _ in range(3):
-                next_btn = page.wait_for_selector(constants.NEXT_BUTTON, timeout=10000)
-                if not next_btn:
-                    raise SelectorChangedError("Next button selector not found")
-                next_btn.click()
+                self._safe_click(page, constants.NEXT_BUTTON, timeout_ms=10000, allow_force=True)
                 self._random_delay("nav")
 
             self._wait_for_scrim_dismissed(page)
@@ -229,17 +352,16 @@ class YouTubeBrowserAdapter:
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
             self._check_verification_required(page)
+            self._check_channel_creation_required(page)
+            self._dismiss_warm_welcome(page)
 
             self._random_delay("nav")
 
             # Wait for page to fully load, click playlist trigger
             try:
-                trigger = page.wait_for_selector(constants.PLAYLIST_TRIGGER, timeout=15000)
+                self._safe_click(page, constants.PLAYLIST_TRIGGER, timeout_ms=15000)
             except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Playlist trigger not found") from e
-            if not trigger:
-                raise SelectorChangedError("Playlist trigger not found")
-            trigger.click()
             self._random_delay("field")
 
             # Wait for playlist dialog to open

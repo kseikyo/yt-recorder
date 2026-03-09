@@ -19,6 +19,11 @@ DONE_BUTTON = "#done-button"
 
 # Dialog scrim overlay (exclude nav-backdrop which is always visible)
 DIALOG_SCRIM = "tp-yt-iron-overlay-backdrop:not(#nav-backdrop)"
+WARM_WELCOME_DIALOG = "ytcp-warm-welcome-dialog"
+WARM_WELCOME_PRIMARY_BUTTON = "ytcp-warm-welcome-dialog ytcp-button"
+CHANNEL_CREATE_BUTTON = "#create-channel-button"
+CHANNEL_IDENTITY_DIALOG = "ytcp-identity-config-dialog"
+CHANNEL_APPEAR_HEADING = 'text="How you\'ll appear"'
 
 # Video URL extraction
 VIDEO_URL_ELEMENT = "span.video-url-fadeable a"
