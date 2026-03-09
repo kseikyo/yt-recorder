@@ -360,7 +360,7 @@ class YouTubeBrowserAdapter:
             # Wait for page to fully load, click playlist trigger
             try:
                 self._safe_click(page, constants.PLAYLIST_TRIGGER, timeout_ms=15000)
-            except PlaywrightTimeoutError as e:
+            except (PlaywrightTimeoutError, SelectorChangedError) as e:
                 raise SelectorChangedError("Playlist trigger not found") from e
             self._random_delay("field")
 
