@@ -287,6 +287,11 @@ The account has not finished YouTube channel creation. Complete this manually in
 yt-recorder setup --account <name>
 ```
 
+### Upload blocked by "Unlock more on YouTube"
+
+YouTube may require phone verification for uploads over 15 minutes.
+`yt-recorder` does not automate Verify/SMS; it auto-splits the file into <=15-minute parts and uploads those parts.
+
 When upload or playlist assignment fails, debug screenshots are written to:
 - `/tmp/yt-recorder-debug-upload-*.png`
 - `/tmp/yt-recorder-debug-playlist-*.png`
