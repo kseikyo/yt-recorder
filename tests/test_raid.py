@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -81,9 +81,15 @@ class TestRaidAdapter:
             accounts, headless=True, delays={}, adapter_factory=lambda x, b: mock_adapter
         )
         raid.open()
+        browser = raid._browser
+        playwright = raid._playwright
         raid.close()
 
         assert mock_adapter.close.call_count == 3
+        assert browser is not None
+        browser.close.assert_called_once()  # type: ignore[attr-defined]
+        assert playwright is not None
+        playwright.stop.assert_called_once()  # type: ignore[attr-defined]
 
     def test_upload_returns_all_results(
         self, accounts: list[YouTubeAccount], mock_adapter: Mock
