@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,6 +11,7 @@ from yt_recorder import constants
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import (
     BotDetectionError,
+    ChannelCreationRequiredError,
     SelectorChangedError,
     SessionExpiredError,
     UnsupportedBrowserError,
@@ -112,13 +114,93 @@ class TestCheckVerificationRequired:
             adapter._check_verification_required(mock_page)
 
 
+class TestCheckChannelCreationRequired:
+    @pytest.mark.parametrize(
+        "selector",
+        [
+            constants.CHANNEL_IDENTITY_DIALOG,
+            constants.CHANNEL_CREATE_BUTTON,
+            constants.CHANNEL_APPEAR_HEADING,
+        ],
+    )
+    def test_check_channel_creation_required_detects_gate(
+        self, adapter: YouTubeBrowserAdapter, selector: str
+    ) -> None:
+        mock_page = Mock()
+
+        def side_effect(current_selector: str) -> Mock | None:
+            if current_selector == selector:
+                return Mock()
+            return None
+
+        mock_page.query_selector.side_effect = side_effect
+
+        with pytest.raises(ChannelCreationRequiredError):
+            adapter._check_channel_creation_required(mock_page)
+
+
+class TestDismissWarmWelcome:
+    def test_dismiss_warm_welcome_clicks_primary_button(
+        self, adapter: YouTubeBrowserAdapter
+    ) -> None:
+        mock_page = Mock()
+        mock_button = Mock()
+
+        def side_effect(selector: str) -> Mock | None:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return Mock()
+            if selector == constants.WARM_WELCOME_PRIMARY_BUTTON:
+                return mock_button
+            return None
+
+        mock_page.query_selector.side_effect = side_effect
+
+        adapter._dismiss_warm_welcome(mock_page)
+
+        mock_button.click.assert_called_once()
+        mock_page.wait_for_selector.assert_any_call(
+            constants.WARM_WELCOME_DIALOG,
+            state="hidden",
+            timeout=5000,
+        )
+
+    def test_dismiss_warm_welcome_esc_fallback(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_page = Mock()
+        press_mock = Mock()
+        mock_page.keyboard = Mock(press=press_mock)
+
+        def side_effect(selector: str) -> Mock | None:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return Mock()
+            if selector == constants.WARM_WELCOME_PRIMARY_BUTTON:
+                return None
+            return None
+
+        mock_page.query_selector.side_effect = side_effect
+
+        adapter._dismiss_warm_welcome(mock_page)
+
+        press_mock.assert_called_once_with("Escape")
+
+    def test_dismiss_warm_welcome_no_dialog_noop(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_page = Mock()
+        press_mock = Mock()
+        mock_page.keyboard = Mock(press=press_mock)
+        mock_page.query_selector.return_value = None
+
+        adapter._dismiss_warm_welcome(mock_page)
+
+        press_mock.assert_not_called()
+
+
 class TestOpen:
     def test_open_creates_context(self, adapter: YouTubeBrowserAdapter) -> None:
         mock_context = Mock()
-        adapter.browser.new_context.return_value = mock_context
+        browser = cast(Mock, adapter.browser)
+        browser.new_context.return_value = mock_context
         adapter.open()
         assert adapter.context == mock_context
-        adapter.browser.new_context.assert_called_once_with(
+        browser.new_context.assert_called_once_with(
             storage_state=str(adapter.account.storage_state)
         )
 
@@ -127,12 +209,13 @@ class TestClose:
     def test_close_saves_storage_state(self, adapter: YouTubeBrowserAdapter) -> None:
         mock_context = Mock()
         adapter.context = mock_context
+        browser = cast(Mock, adapter.browser)
         with patch("os.chmod"):
             adapter.close()
         mock_context.storage_state.assert_called_once()
         mock_context.close.assert_called_once()
         # Should NOT call browser.close() — RaidAdapter owns browser
-        adapter.browser.close.assert_not_called()
+        browser.close.assert_not_called()
 
     def test_close_no_context(self, adapter: YouTubeBrowserAdapter) -> None:
         adapter.context = None
@@ -368,3 +451,38 @@ class TestAssignPlaylist:
 
         assert result is False
         assert "no playlists" in caplog.text
+
+
+class TestSafeClick:
+    def test_safe_click_next_waits_for_element_from_point_guard(
+        self, adapter: YouTubeBrowserAdapter
+    ) -> None:
+        mock_page = Mock()
+        mock_target = Mock()
+        mock_dialog = Mock()
+        mock_dialog.get_attribute.return_value = "details"
+
+        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
+            if selector == constants.NEXT_BUTTON:
+                return mock_target
+            if selector == constants.DIALOG_SCRIM:
+                return None
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return None
+            return None
+
+        def query_selector_side_effect(selector: str) -> Mock | None:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return None
+            if selector == constants.UPLOAD_DIALOG:
+                return mock_dialog
+            return None
+
+        mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
+        mock_page.query_selector.side_effect = query_selector_side_effect
+        mock_target.click.return_value = None
+
+        adapter._safe_click(mock_page, constants.NEXT_BUTTON, timeout_ms=10000)
+
+        scripts = [call.args[0] for call in mock_page.wait_for_function.call_args_list]
+        assert any("elementFromPoint" in script for script in scripts)

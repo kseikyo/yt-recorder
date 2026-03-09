@@ -8,6 +8,7 @@ import pytest
 
 from yt_recorder.config import Config
 from yt_recorder.domain.exceptions import (
+    ChannelCreationRequiredError,
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
     TranscriptUnavailableError,
@@ -216,6 +217,22 @@ class TestRecordingPipeline:
 
         assert report.uploaded == 0
         assert any("file not found" in e for e in report.errors)
+
+    def test_upload_new_aborts_on_channel_creation_gate(
+        self, config: Config, mock_registry: Mock, mock_raid: Mock, tmp_path: Path
+    ) -> None:
+        (tmp_path / "test1.mp4").write_text("fake")
+        (tmp_path / "test2.mp4").write_text("fake")
+        blocked_adapter = Mock()
+        blocked_adapter.upload.side_effect = ChannelCreationRequiredError("channel required")
+        mock_raid.get_adapter.return_value = blocked_adapter
+
+        pipeline = RecordingPipeline(config, mock_registry, mock_raid)
+        report = pipeline.upload_new(tmp_path, single_account="primary")
+
+        assert blocked_adapter.upload.call_count == 1
+        assert report.upload_failed == 1
+        assert any("channel required" in error for error in report.errors)
 
 
 class TestFetchTranscripts:
