@@ -279,6 +279,18 @@ Update selectors in `src/yt_recorder/constants.py` or check for yt-recorder upda
 
 Wait and retry later. Consider using `--no-headless` flag.
 
+### Upload blocked by "How you'll appear" / "Create channel"
+
+The account has not finished YouTube channel creation. Complete this manually in YouTube/Studio, then rerun:
+
+```bash
+yt-recorder setup --account <name>
+```
+
+When upload or playlist assignment fails, debug screenshots are written to:
+- `/tmp/yt-recorder-debug-upload-*.png`
+- `/tmp/yt-recorder-debug-playlist-*.png`
+
 ### Transcripts not available immediately
 
 YouTube auto-captions take minutes to hours to process. Re-run `transcribe` later.

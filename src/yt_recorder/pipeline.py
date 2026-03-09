@@ -12,6 +12,7 @@ from yt_recorder.adapters.scanner import scan_recordings
 from yt_recorder.adapters.transcriber import YtdlpTranscriptAdapter
 from yt_recorder.config import Config, load_config, save_detected_limit
 from yt_recorder.domain.exceptions import (
+    ChannelCreationRequiredError,
     DailyLimitError,
     RegistryFileNotFoundError,
     TranscriptNotReadyError,
@@ -245,6 +246,12 @@ class RecordingPipeline:
                     else:
                         kept_count += 1
 
+                except ChannelCreationRequiredError as e:
+                    errors.append(f"Failed to upload {path}: {e}")
+                    upload_failed += 1
+                    stop_all_uploads = True
+                    logger.exception("Upload blocked by channel creation gate for %s", path)
+                    break
                 except Exception as e:
                     errors.append(f"Failed to upload {path}: {e}")
                     upload_failed += 1
