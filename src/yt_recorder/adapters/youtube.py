@@ -21,6 +21,7 @@ from yt_recorder.domain.exceptions import (
     DailyLimitError,
     SelectorChangedError,
     SessionExpiredError,
+    UnsupportedBrowserError,
     UploadTimeoutError,
     VideoTooLongError,
 )
@@ -53,6 +54,13 @@ class YouTubeBrowserAdapter:
         if captcha_elem:
             raise BotDetectionError("CAPTCHA or challenge page detected")
 
+    def _check_unsupported_browser(self, page: Page) -> None:
+        indicator = page.query_selector(constants.UNSUPPORTED_BROWSER_INDICATOR)
+        if indicator:
+            raise UnsupportedBrowserError(
+                "YouTube rejected browser as unsupported. Run: playwright install chromium"
+            )
+
     def _check_session_expired(self, page: Page) -> None:
         if "accounts.google.com" in page.url:
             raise SessionExpiredError("Session expired, redirected to login")
@@ -81,11 +89,12 @@ class YouTubeBrowserAdapter:
             page.goto(constants.UPLOAD_URL, wait_until="domcontentloaded")
             self._check_session_expired(page)
             self._check_bot_detection(page)
+            self._check_unsupported_browser(page)
 
             self._random_delay("nav")
 
             try:
-                page.wait_for_selector("ytcp-uploads-file-picker", timeout=15000)
+                page.wait_for_selector(constants.UPLOAD_FILE_PICKER, timeout=15000)
                 file_input = page.wait_for_selector(
                     constants.FILE_INPUT, state="attached", timeout=5000
                 )
@@ -184,7 +193,7 @@ class YouTubeBrowserAdapter:
 
             # Wait for upload dialog to close after publishing
             try:
-                page.wait_for_selector("ytcp-uploads-dialog", state="hidden", timeout=60000)
+                page.wait_for_selector(constants.UPLOAD_DIALOG, state="hidden", timeout=60000)
             except PlaywrightTimeoutError:
                 logger.warning("Upload dialog did not close, but video was published")
 
@@ -210,6 +219,7 @@ class YouTubeBrowserAdapter:
             page.goto(edit_url, wait_until="domcontentloaded")
             self._check_session_expired(page)
             self._check_bot_detection(page)
+            self._check_unsupported_browser(page)
 
             self._random_delay("nav")
 

@@ -60,7 +60,7 @@ def build_upload_page(wait_result: dict[str, object]) -> tuple[MagicMock, MagicM
         return None
 
     def wait_for_selector_side_effect(selector: str, **_: object) -> MagicMock | None:
-        if selector == "ytcp-uploads-file-picker":
+        if selector == constants.UPLOAD_FILE_PICKER:
             return MagicMock()
         if selector == constants.FILE_INPUT:
             return mock_file_input

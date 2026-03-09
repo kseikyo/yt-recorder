@@ -21,9 +21,7 @@ class TestRaidAdapter:
         mock_pw.return_value.start.return_value = mock_playwright_inst
         mock_playwright_inst.chromium.launch.return_value = mock_browser
         monkeypatch.setattr("yt_recorder.adapters.raid.sync_playwright", mock_pw)
-        monkeypatch.setattr(
-            "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
-        )
+        self.mock_playwright_inst = mock_playwright_inst
 
     @pytest.fixture
     def accounts(self) -> list[YouTubeAccount]:
@@ -73,6 +71,7 @@ class TestRaidAdapter:
         raid.open()
 
         assert mock_adapter.open.call_count == 3
+        self.mock_playwright_inst.chromium.launch.assert_called_once_with(headless=True)
 
     def test_close_closes_all_browsers(
         self, accounts: list[YouTubeAccount], mock_adapter: Mock

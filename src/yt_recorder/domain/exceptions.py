@@ -45,6 +45,10 @@ class BotDetectionError(YouTubeError):
     """CAPTCHA or challenge page detected."""
 
 
+class UnsupportedBrowserError(YouTubeError):
+    """YouTube rejected the browser as unsupported or outdated."""
+
+
 class SelectorChangedError(YouTubeError):
     """YouTube UI selector not found (UI may have changed)."""
 
@@ -59,6 +63,7 @@ class DailyLimitError(YouTubeError):
 
 class VideoTooLongError(YouTubeError):
     """Video exceeds account's duration limit."""
+
     def __init__(self, message: str, detected_limit_secs: float | None = None) -> None:
         super().__init__(message)
         self.detected_limit_secs = detected_limit_secs

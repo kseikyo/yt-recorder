@@ -6,11 +6,13 @@ from unittest.mock import Mock, patch
 import pytest
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from yt_recorder import constants
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
 from yt_recorder.domain.exceptions import (
     BotDetectionError,
     SelectorChangedError,
     SessionExpiredError,
+    UnsupportedBrowserError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
@@ -202,7 +204,7 @@ class TestUpload:
             return None
 
         def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
-            if selector == "ytcp-uploads-file-picker":
+            if selector == constants.UPLOAD_FILE_PICKER:
                 return Mock()
             elif selector == 'input[type="file"]':
                 return mock_file_input
@@ -234,6 +236,25 @@ class TestUpload:
         assert result.url == "https://youtu.be/abc123"
         assert result.title == "Test Video"
         assert result.account_name == "primary"
+
+    def test_upload_unsupported_browser_raises_error(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_context = Mock()
+        mock_page = Mock()
+        mock_page.url = "https://www.youtube.com/upload"
+
+        def query_selector_side_effect(selector: str) -> Mock | None:
+            if selector == constants.CAPTCHA_INDICATOR:
+                return None
+            if selector == constants.UNSUPPORTED_BROWSER_INDICATOR:
+                return Mock()  # truthy — interstitial detected
+            return None
+
+        mock_page.query_selector.side_effect = query_selector_side_effect
+        mock_context.new_page.return_value = mock_page
+        adapter.context = mock_context
+
+        with pytest.raises(UnsupportedBrowserError):
+            adapter.upload(Path("/tmp/test.mp4"), "Test Title")
 
 
 class TestAssignPlaylist:
@@ -270,7 +291,7 @@ class TestAssignPlaylist:
                 == 'ytcp-video-metadata-playlists ytcp-dropdown-trigger[aria-label="Select playlists"]'
             ):
                 return mock_playlist_trigger
-            elif selector == "ytcp-playlist-dialog #search-input":
+            elif selector == "ytcp-playlist-dialog input#search-input":
                 return mock_search_input
             elif selector == '#items tp-yt-paper-checkbox:has-text("my-playlist")':
                 return mock_playlist_item

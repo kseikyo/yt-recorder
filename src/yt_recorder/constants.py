@@ -4,6 +4,8 @@ STUDIO_EDIT_URL = "https://studio.youtube.com/video/{video_id}/edit"
 
 # File input selector
 FILE_INPUT = 'input[type="file"]'
+UPLOAD_FILE_PICKER = "ytcp-uploads-file-picker"
+UPLOAD_DIALOG = "ytcp-uploads-dialog"
 
 # Form field selectors
 TITLE_INPUT = "#title-textarea #textbox"
@@ -28,6 +30,9 @@ DAILY_LIMIT_ERROR = "text=upload limit"
 
 # Bot detection indicators
 CAPTCHA_INDICATOR = "iframe[src*='recaptcha'], div#captcha-container"
+
+# Unsupported browser detection
+UNSUPPORTED_BROWSER_INDICATOR = 'text="Improve your experience"'
 
 # Default upload timeout (30 minutes)
 UPLOAD_TIMEOUT_SECONDS = 30 * 60
