@@ -13,6 +13,7 @@ from yt_recorder.domain.exceptions import (
     SelectorChangedError,
     SessionExpiredError,
     UnsupportedBrowserError,
+    VerificationRequiredError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
@@ -96,6 +97,19 @@ class TestCheckSessionExpired:
         mock_page.url = "https://accounts.google.com/signin"
         with pytest.raises(SessionExpiredError):
             adapter._check_session_expired(mock_page)
+
+
+class TestCheckVerificationRequired:
+    def test_check_verification_required_no_dialog(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_page = Mock()
+        mock_page.query_selector.return_value = None
+        adapter._check_verification_required(mock_page)
+
+    def test_check_verification_required_dialog_found(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_page = Mock()
+        mock_page.query_selector.return_value = Mock()
+        with pytest.raises(VerificationRequiredError):
+            adapter._check_verification_required(mock_page)
 
 
 class TestOpen:
@@ -324,3 +338,33 @@ class TestAssignPlaylist:
         mock_playlist_item.click.assert_called_once()
         mock_done_btn.click.assert_called_once()
         mock_page_save_btn.click.assert_called_once()
+
+    def test_assign_playlist_no_playlists_hidden_search_input(
+        self, adapter: YouTubeBrowserAdapter, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        mock_context = Mock()
+        mock_page = Mock()
+        mock_page.url = "https://studio.youtube.com/video/abc123/edit"
+
+        mock_playlist_trigger = Mock()
+        mock_search_input = Mock()
+        mock_search_input.is_visible.return_value = False
+
+        def wait_for_selector_side_effect(selector: str, **kwargs: object) -> Mock | None:
+            if selector == constants.PLAYLIST_TRIGGER:
+                return mock_playlist_trigger
+            if selector == constants.PLAYLIST_SEARCH_INPUT:
+                assert kwargs.get("state") == "attached"
+                return mock_search_input
+            return None
+
+        mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
+        mock_page.query_selector.return_value = None
+        mock_context.new_page.return_value = mock_page
+        adapter.context = mock_context
+
+        with caplog.at_level("WARNING"):
+            result = adapter.assign_playlist("abc123", "my-playlist")
+
+        assert result is False
+        assert "no playlists" in caplog.text

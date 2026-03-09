@@ -244,11 +244,19 @@ class YouTubeBrowserAdapter:
 
             # Wait for playlist dialog to open
             try:
-                search_input = page.wait_for_selector(constants.PLAYLIST_SEARCH_INPUT, timeout=5000)
+                search_input = page.wait_for_selector(
+                    constants.PLAYLIST_SEARCH_INPUT, state="attached", timeout=5000
+                )
             except PlaywrightTimeoutError as e:
                 raise SelectorChangedError("Playlist dialog did not open") from e
             if not search_input:
                 raise SelectorChangedError("Playlist search input not found")
+            if not search_input.is_visible():
+                logger.warning(
+                    "Playlist search input hidden (account has no playlists) for video %s",
+                    video_id,
+                )
+                return False
 
             # Type playlist name into search (handles special chars safely)
             search_input.fill(playlist_name)
