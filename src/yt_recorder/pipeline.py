@@ -421,6 +421,7 @@ class RecordingPipeline:
         n = len(parts)
         if n == 0:
             return
+        logger.debug("uploading %d parts for %s to %s", n, original_path.name, account_name)
 
         file_key = str(original_path.relative_to(directory))
         truncated_base = base_title[:100]
@@ -436,10 +437,13 @@ class RecordingPipeline:
         for i, part in enumerate(parts, 1):
             if i in uploaded_part_indexes:
                 continue
+            logger.debug("part %d/%d: %s", i, n, part.name)
 
             part_title = f"{truncated_base} [Part {i}/{n}]"
+            logger.debug("part %d/%d title: %s", i, n, part_title)
             description = f"Part {i} of {n}. Original: {original_path.name}"
             result = raid.upload_to_account(account_name, part, part_title, description=description)
+            logger.info("part %d/%d uploaded: video_id=%s", i, n, result.video_id)
             playlist_ok = raid.assign_playlist_to_account(account_name, result.video_id, playlist)
             if not playlist_ok:
                 logger.warning(
@@ -447,6 +451,8 @@ class RecordingPipeline:
                     playlist,
                     account_name,
                 )
+            else:
+                logger.debug("playlist assign %s: ok", playlist)
 
             part_file_key = str(part.relative_to(directory))
             entry = RegistryEntry(
@@ -460,6 +466,7 @@ class RecordingPipeline:
                 parent_file=file_key,
             )
             registry.append(entry)
+            logger.debug("registry: appended part %d/%d key=%s", i, n, part_file_key)
 
     def assign_playlists(
         self,
