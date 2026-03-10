@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 from yt_recorder.adapters.splitter import TIER_15MIN
 from yt_recorder.config import Config
@@ -93,3 +96,32 @@ def test_upload_new_single_account_splits_on_phone_verification(tmp_path: Path) 
     )
     appended_entry = registry.append.call_args.args[0]
     assert appended_entry.account_ids == {"primary": "—"}
+
+
+def test_upload_new_logs_split_on_phone_verification(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "video.mp4"
+    path.write_text("x")
+
+    account = YouTubeAccount("primary", Path("/tmp/p.json"), Path("/tmp/p.txt"), "primary")
+
+    registry = Mock()
+    registry.load.return_value = []
+    raid = Mock()
+    blocked_adapter = Mock()
+    blocked_adapter.upload.side_effect = PhoneVerificationRequiredError()
+    raid.get_adapter.return_value = blocked_adapter
+
+    pipeline = RecordingPipeline(_config([account]), registry, raid)
+
+    with caplog.at_level(logging.INFO, logger="yt_recorder.pipeline"):
+        with patch("yt_recorder.pipeline.scan_recordings", return_value=[(path, "root")]):
+            with patch("yt_recorder.adapters.splitter.VideoSplitter") as splitter_cls:
+                splitter_cls.return_value.split.return_value = [tmp_path / "part1.mp4"]
+                with patch.object(pipeline, "_upload_parts_to_account"):
+                    with patch("yt_recorder.pipeline.save_detected_limit"):
+                        report = pipeline.upload_new(tmp_path, single_account="primary")
+
+    assert report.uploaded == 1
+    assert any("phone-verification required" in record.message for record in caplog.records)

@@ -256,6 +256,27 @@ class TestDismissWarmWelcome:
 
         press_mock.assert_not_called()
 
+    def test_dismiss_warm_welcome_hidden_dialog_noop(self, adapter: YouTubeBrowserAdapter) -> None:
+        mock_page = Mock()
+        press_mock = Mock()
+        mock_page.keyboard = Mock(press=press_mock)
+
+        dialog_locator = Mock()
+        dialog_locator.count.return_value = 1
+        dialog_locator.first.is_visible.return_value = False
+
+        def locator_side_effect(selector: str) -> Mock:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return dialog_locator
+            return Mock()
+
+        mock_page.locator.side_effect = locator_side_effect
+
+        adapter._dismiss_warm_welcome(mock_page)
+
+        press_mock.assert_not_called()
+        mock_page.wait_for_selector.assert_not_called()
+
 
 class TestOpen:
     def test_open_creates_context(self, adapter: YouTubeBrowserAdapter) -> None:
