@@ -94,16 +94,22 @@ class YouTubeBrowserAdapter:
             raise PhoneVerificationRequiredError()
 
     def _dismiss_warm_welcome(self, page: Page) -> None:
-        dialog = page.query_selector(constants.WARM_WELCOME_DIALOG)
-        if not dialog:
-            return
-        primary = page.query_selector(constants.WARM_WELCOME_PRIMARY_BUTTON)
-        if primary:
-            primary.click()
-        else:
-            page.keyboard.press("Escape")
-        page.wait_for_selector(constants.WARM_WELCOME_DIALOG, state="hidden", timeout=5000)
-        self._wait_for_scrim_dismissed(page)
+        try:
+            locator = page.locator(constants.WARM_WELCOME_DIALOG)
+            if locator.count() == 0 or not locator.first.is_visible():
+                return
+            logger.debug("warm-welcome dialog visible, dismissing")
+            primary = page.locator(constants.WARM_WELCOME_PRIMARY_BUTTON).first
+            if primary.is_visible():
+                logger.debug("clicking primary button")
+                primary.click()
+            else:
+                logger.debug("primary not visible, pressing Escape")
+                page.keyboard.press("Escape")
+            page.wait_for_selector(constants.WARM_WELCOME_DIALOG, state="hidden", timeout=5000)
+            self._wait_for_scrim_dismissed(page)
+        except PlaywrightTimeoutError:
+            logger.debug("warm-welcome dismiss timed out, continuing")
 
     def _check_session_expired(self, page: Page) -> None:
         if "accounts.google.com" in page.url:
