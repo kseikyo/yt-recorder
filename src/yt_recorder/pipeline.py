@@ -126,8 +126,24 @@ class RecordingPipeline:
         self.raid.open()
         stop_all_uploads = False
 
+        logger.info(
+            "upload run: dir=%s limit=%s keep=%s retry_failed=%s single_account=%s",
+            directory,
+            limit,
+            keep,
+            retry_failed,
+            single_account,
+        )
+
         try:
             for idx, (path, playlist) in enumerate(files_to_process):
+                logger.info(
+                    "upload file %d/%d: %s playlist=%s",
+                    idx + 1,
+                    len(files_to_process),
+                    path.name,
+                    playlist,
+                )
                 if stop_all_uploads:
                     break
                 if progress_callback:
@@ -138,6 +154,7 @@ class RecordingPipeline:
                     results: dict[str, UploadResult | None]
 
                     if single_account:
+                        logger.debug("uploading to single account: %s", single_account)
                         adapter = self.raid.get_adapter(single_account)
                         try:
                             result = adapter.upload(path, title)
@@ -146,6 +163,11 @@ class RecordingPipeline:
                             if not pl_ok:
                                 playlist_failed += 1
                         except PhoneVerificationRequiredError:
+                            logger.info(
+                                "phone-verification required for %s on %s, splitting at TIER_15MIN",
+                                path.name,
+                                single_account,
+                            )
                             parts = splitter.split(path, TIER_15MIN)
                             self._upload_parts_to_account(
                                 raid=self.raid,
@@ -173,6 +195,7 @@ class RecordingPipeline:
 
                             for account in accounts:
                                 account_name = account.name
+                                logger.debug("uploading to account: %s", account_name)
                                 try:
                                     account_limit = account.upload_limit_secs
                                     if account_limit is not None:
@@ -234,6 +257,11 @@ class RecordingPipeline:
                                             config_path, account_name, detected_limit
                                         )
                                 except PhoneVerificationRequiredError:
+                                    logger.info(
+                                        "phone-verification required for %s on %s, splitting at TIER_15MIN",
+                                        path.name,
+                                        account_name,
+                                    )
                                     parts = splitter.split(path, TIER_15MIN)
                                     self._upload_parts_to_account(
                                         raid=self.raid,
@@ -279,6 +307,7 @@ class RecordingPipeline:
                         kept_count += 1
 
                 except ChannelCreationRequiredError as e:
+                    logger.info("channel not created on account, aborting upload for %s", path.name)
                     errors.append(f"Failed to upload {path}: {e}")
                     upload_failed += 1
                     stop_all_uploads = True
