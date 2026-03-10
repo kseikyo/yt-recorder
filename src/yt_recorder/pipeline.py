@@ -197,27 +197,75 @@ class RecordingPipeline:
                                 account_name = account.name
                                 logger.debug("uploading to account: %s", account_name)
                                 try:
-                                    account_limit = account.upload_limit_secs
-                                    if account_limit is not None:
-                                        if duration is None:
-                                            duration = splitter.get_duration(path)
-                                        over_limit = duration > account_limit
-                                    else:
-                                        over_limit = False
-
-                                    if over_limit:
-                                        if account_limit is None:
-                                            continue
-                                        assert account_limit is not None
-                                        temp_dir = path.parent / f".{path.stem}_parts"
-                                        if temp_dir.exists():
-                                            parts = sorted(
-                                                temp_dir.glob(f"{path.stem}_part*{path.suffix}")
-                                            )
-                                            if not parts:
-                                                parts = splitter.split(path, account_limit)
+                                    try:
+                                        account_limit = account.upload_limit_secs
+                                        if account_limit is not None:
+                                            if duration is None:
+                                                duration = splitter.get_duration(path)
+                                            over_limit = duration > account_limit
                                         else:
-                                            parts = splitter.split(path, account_limit)
+                                            over_limit = False
+
+                                        if over_limit:
+                                            if account_limit is None:
+                                                continue
+                                            assert account_limit is not None
+                                            temp_dir = path.parent / f".{path.stem}_parts"
+                                            if temp_dir.exists():
+                                                parts = sorted(
+                                                    temp_dir.glob(f"{path.stem}_part*{path.suffix}")
+                                                )
+                                                if not parts:
+                                                    parts = splitter.split(path, account_limit)
+                                            else:
+                                                parts = splitter.split(path, account_limit)
+                                            self._upload_parts_to_account(
+                                                raid=self.raid,
+                                                registry=self.registry,
+                                                account_name=account_name,
+                                                parts=parts,
+                                                base_title=title,
+                                                playlist=playlist,
+                                                original_path=path,
+                                                directory=directory,
+                                            )
+                                        else:
+                                            result = self.raid.upload_to_account(
+                                                account_name, path, title
+                                            )
+                                            playlist_ok = self.raid.assign_playlist_to_account(
+                                                account_name,
+                                                result.video_id,
+                                                playlist,
+                                            )
+                                            if not playlist_ok:
+                                                playlist_failed += 1
+                                            all_account_results[account_name] = result
+                                    except VideoTooLongError:
+                                        detected_limit = self._detect_tier(
+                                            raid=self.raid,
+                                            splitter=splitter,
+                                            account=account,
+                                            path=path,
+                                            title=title,
+                                            playlist=playlist,
+                                            directory=directory,
+                                            registry=self.registry,
+                                        )
+                                        if detected_limit is not None:
+                                            config_path = (
+                                                Config.default_config_dir() / "config.toml"
+                                            )
+                                            save_detected_limit(
+                                                config_path, account_name, detected_limit
+                                            )
+                                    except PhoneVerificationRequiredError:
+                                        logger.info(
+                                            "phone-verification required for %s on %s, splitting at TIER_15MIN",
+                                            path.name,
+                                            account_name,
+                                        )
+                                        parts = splitter.split(path, TIER_15MIN)
                                         self._upload_parts_to_account(
                                             raid=self.raid,
                                             registry=self.registry,
@@ -228,57 +276,17 @@ class RecordingPipeline:
                                             original_path=path,
                                             directory=directory,
                                         )
-                                    else:
-                                        result = self.raid.upload_to_account(
-                                            account_name, path, title
-                                        )
-                                        playlist_ok = self.raid.assign_playlist_to_account(
-                                            account_name,
-                                            result.video_id,
-                                            playlist,
-                                        )
-                                        if not playlist_ok:
-                                            playlist_failed += 1
-                                        all_account_results[account_name] = result
-                                except VideoTooLongError:
-                                    detected_limit = self._detect_tier(
-                                        raid=self.raid,
-                                        splitter=splitter,
-                                        account=account,
-                                        path=path,
-                                        title=title,
-                                        playlist=playlist,
-                                        directory=directory,
-                                        registry=self.registry,
-                                    )
-                                    if detected_limit is not None:
                                         config_path = Config.default_config_dir() / "config.toml"
-                                        save_detected_limit(
-                                            config_path, account_name, detected_limit
+                                        save_detected_limit(config_path, account_name, TIER_15MIN)
+                                    except DailyLimitError:
+                                        logger.warning(
+                                            "Daily limit hit for %s, stopping", account_name
                                         )
-                                except PhoneVerificationRequiredError:
-                                    logger.info(
-                                        "phone-verification required for %s on %s, splitting at TIER_15MIN",
-                                        path.name,
-                                        account_name,
-                                    )
-                                    parts = splitter.split(path, TIER_15MIN)
-                                    self._upload_parts_to_account(
-                                        raid=self.raid,
-                                        registry=self.registry,
-                                        account_name=account_name,
-                                        parts=parts,
-                                        base_title=title,
-                                        playlist=playlist,
-                                        original_path=path,
-                                        directory=directory,
-                                    )
-                                    config_path = Config.default_config_dir() / "config.toml"
-                                    save_detected_limit(config_path, account_name, TIER_15MIN)
-                                except DailyLimitError:
-                                    logger.warning("Daily limit hit for %s, stopping", account_name)
-                                    stop_all_uploads = True
-                                    break
+                                        stop_all_uploads = True
+                                        break
+                                except Exception as e:
+                                    logger.warning("Account %s failed: %s", account_name, e)
+                                    all_account_results[account_name] = None
 
                             results = all_account_results
 
