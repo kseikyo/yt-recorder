@@ -49,6 +49,8 @@ def build_upload_page(wait_result: dict[str, object]) -> tuple[MagicMock, MagicM
 
     mock_video_url_elem.get_attribute.return_value = "https://youtu.be/abc123"
     mock_handle.json_value.return_value = wait_result
+    mock_warm_welcome_dialog = MagicMock()
+    mock_warm_welcome_dialog.count.return_value = 0
 
     def query_selector_side_effect(selector: str) -> MagicMock | None:
         if selector == constants.CAPTCHA_INDICATOR:
@@ -81,7 +83,15 @@ def build_upload_page(wait_result: dict[str, object]) -> tuple[MagicMock, MagicM
     mock_page.query_selector.side_effect = query_selector_side_effect
     mock_page.wait_for_selector.side_effect = wait_for_selector_side_effect
     mock_page.wait_for_function.return_value = mock_handle
-    mock_page.locator.return_value = mock_description_box
+
+    def locator_side_effect(selector: str) -> MagicMock:
+        if selector == constants.WARM_WELCOME_DIALOG:
+            return mock_warm_welcome_dialog
+        if selector == constants.DESCRIPTION_TEXTAREA:
+            return mock_description_box
+        return MagicMock()
+
+    mock_page.locator.side_effect = locator_side_effect
 
     return mock_page, mock_description_box, mock_done_btn
 
@@ -140,7 +150,7 @@ class TestUploadV2:
         with patch.object(adapter, "_random_delay"):
             adapter.upload(Path("/tmp/video.mp4"), "Test Video", description="[Part 1/3]")
 
-        mock_page.locator.assert_called_once_with(constants.DESCRIPTION_TEXTAREA)
+        mock_page.locator.assert_any_call(constants.DESCRIPTION_TEXTAREA)
         mock_description_box.fill.assert_called_once_with("[Part 1/3]")
 
     def test_upload_skips_description_when_empty(self, adapter: YouTubeBrowserAdapter) -> None:
@@ -152,7 +162,6 @@ class TestUploadV2:
         with patch.object(adapter, "_random_delay"):
             adapter.upload(Path("/tmp/video.mp4"), "Test Video", description="")
 
-        mock_page.locator.assert_not_called()
         mock_description_box.fill.assert_not_called()
 
 
