@@ -353,7 +353,10 @@ class YouTubeBrowserAdapter:
                 account_name=self.account.name,
             )
         except Exception:
-            page.screenshot(path=f"/tmp/yt-recorder-debug-upload-{int(time.time())}.png")
+            try:
+                page.screenshot(path=f"/tmp/yt-recorder-debug-upload-{int(time.time())}.png")
+            except Exception:
+                logger.debug("Failed to capture debug screenshot", exc_info=True)
             raise
         finally:
             page.close()
@@ -455,7 +458,10 @@ class YouTubeBrowserAdapter:
             self._random_delay("post")
             return True
         except Exception:
-            page.screenshot(path=f"/tmp/yt-recorder-debug-playlist-{video_id}.png")
+            try:
+                page.screenshot(path=f"/tmp/yt-recorder-debug-playlist-{video_id}.png")
+            except Exception:
+                logger.debug("Failed to capture debug screenshot", exc_info=True)
             raise
         finally:
             page.close()
