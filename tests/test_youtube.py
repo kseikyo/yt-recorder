@@ -177,16 +177,26 @@ class TestDismissWarmWelcome:
         self, adapter: YouTubeBrowserAdapter
     ) -> None:
         mock_page = Mock()
+
+        # Dialog locator: visible
+        dialog_locator = Mock()
+        dialog_locator.count.return_value = 1
+        dialog_locator.first.is_visible.return_value = True
+
+        # Primary button locator: visible, click should be called
         mock_button = Mock()
+        mock_button.is_visible.return_value = True
+        primary_locator = Mock()
+        primary_locator.first = mock_button
 
-        def side_effect(selector: str) -> Mock | None:
+        def locator_side_effect(selector: str) -> Mock:
             if selector == constants.WARM_WELCOME_DIALOG:
-                return Mock()
+                return dialog_locator
             if selector == constants.WARM_WELCOME_PRIMARY_BUTTON:
-                return mock_button
-            return None
+                return primary_locator
+            return Mock()
 
-        mock_page.query_selector.side_effect = side_effect
+        mock_page.locator.side_effect = locator_side_effect
 
         adapter._dismiss_warm_welcome(mock_page)
 
@@ -202,14 +212,25 @@ class TestDismissWarmWelcome:
         press_mock = Mock()
         mock_page.keyboard = Mock(press=press_mock)
 
-        def side_effect(selector: str) -> Mock | None:
-            if selector == constants.WARM_WELCOME_DIALOG:
-                return Mock()
-            if selector == constants.WARM_WELCOME_PRIMARY_BUTTON:
-                return None
-            return None
+        # Dialog locator: visible
+        dialog_locator = Mock()
+        dialog_locator.count.return_value = 1
+        dialog_locator.first.is_visible.return_value = True
 
-        mock_page.query_selector.side_effect = side_effect
+        # Primary button locator: NOT visible
+        mock_button = Mock()
+        mock_button.is_visible.return_value = False
+        primary_locator = Mock()
+        primary_locator.first = mock_button
+
+        def locator_side_effect(selector: str) -> Mock:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return dialog_locator
+            if selector == constants.WARM_WELCOME_PRIMARY_BUTTON:
+                return primary_locator
+            return Mock()
+
+        mock_page.locator.side_effect = locator_side_effect
 
         adapter._dismiss_warm_welcome(mock_page)
 
@@ -219,7 +240,17 @@ class TestDismissWarmWelcome:
         mock_page = Mock()
         press_mock = Mock()
         mock_page.keyboard = Mock(press=press_mock)
-        mock_page.query_selector.return_value = None
+
+        # Dialog locator: count == 0 (no dialog)
+        dialog_locator = Mock()
+        dialog_locator.count.return_value = 0
+
+        def locator_side_effect(selector: str) -> Mock:
+            if selector == constants.WARM_WELCOME_DIALOG:
+                return dialog_locator
+            return Mock()
+
+        mock_page.locator.side_effect = locator_side_effect
 
         adapter._dismiss_warm_welcome(mock_page)
 
