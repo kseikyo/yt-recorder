@@ -14,16 +14,22 @@ from yt_recorder.utils import find_chrome
 
 @click.group()
 @click.version_option()
-@click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Enable DEBUG stderr (file sink always DEBUG)",
+)
 def main(verbose: bool) -> None:
     """YouTube recording and transcription pipeline."""
     import logging
 
-    level = logging.DEBUG if verbose else logging.WARNING
-    logging.basicConfig(
-        level=level,
-        format="%(levelname)s: %(message)s",
-    )
+    from yt_recorder.log import configure_logging
+
+    log_file = configure_logging(verbose)
+    if verbose:
+        click.echo(f"log: {log_file}", err=True)
+    logging.getLogger(__name__).debug("log sink ready: %s", log_file)
 
 
 @main.command()
@@ -76,6 +82,9 @@ def upload(
         for error in report.errors:
             click.echo(f"  - {error}")
 
+    if report.upload_failed or report.errors:
+        sys.exit(1)
+
 
 @main.command()
 @click.argument(
@@ -93,10 +102,32 @@ def transcribe(directory: Path, retry: bool, force: bool) -> None:
     click.echo(f"Transcripts fetched: {report.transcripts_fetched}")
     click.echo(f"Pending (not ready): {report.transcripts_pending}")
 
+    skipped_lines: list[str] = []
+    if report.transcripts_skipped_done:
+        skipped_lines.append(f"  {report.transcripts_skipped_done} already done")
+    if report.transcripts_skipped_unavailable:
+        skipped_lines.append(
+            f"  {report.transcripts_skipped_unavailable} marked unavailable (no captions)"
+        )
+    if report.transcripts_skipped_error:
+        skipped_lines.append(
+            f"  {report.transcripts_skipped_error} in error state (use --retry)"
+        )
+    if report.transcripts_skipped_no_primary_id:
+        skipped_lines.append(
+            f"  {report.transcripts_skipped_no_primary_id} have no primary upload "
+            f"(parent stubs / failed primary)"
+        )
+    if skipped_lines:
+        click.echo("Skipped:")
+        for line in skipped_lines:
+            click.echo(line)
+
     if report.errors:
         click.echo("\nErrors:")
         for error in report.errors:
             click.echo(f"  - {error}")
+        sys.exit(1)
 
 
 @main.command()
@@ -141,6 +172,13 @@ def sync(directory: Path, dry_run: bool, limit: int | None, keep: bool, retry_fa
     click.echo(
         f"Fetched: {transcript_report.transcripts_fetched}, Pending: {transcript_report.transcripts_pending}"
     )
+
+    if (
+        upload_report.upload_failed
+        or upload_report.errors
+        or transcript_report.errors
+    ):
+        sys.exit(1)
 
 
 @main.command()
@@ -331,6 +369,135 @@ def clean(directory: Path, dry_run: bool) -> None:
         click.echo(f"\nErrors ({len(report.errors)}):")
         for e in report.errors:
             click.echo(f"  - {e}")
+
+
+@main.group()
+def registry() -> None:
+    """Inspect and repair registry.md."""
+
+
+@registry.command(name="verify")
+@click.argument(
+    "directory", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path)
+)
+def registry_verify(directory: Path) -> None:
+    """Structural check of registry.md.
+
+    Reports: rows whose source file is missing on disk, part rows whose
+    parent_file is absent from the registry, and part_index/total_parts
+    counts that don't match. Exits 0 if the registry is consistent, 1 otherwise.
+    No network access — cannot detect deleted-on-YouTube videos.
+    """
+    from yt_recorder.adapters.registry import MarkdownRegistryStore
+    from yt_recorder.config import load_config
+    from yt_recorder.domain.exceptions import RegistryFileNotFoundError, RegistryParseError
+
+    config = load_config()
+    registry_path = directory / "registry.md"
+    store = MarkdownRegistryStore(registry_path, [a.name for a in config.accounts])
+    try:
+        entries = store.load()
+    except RegistryFileNotFoundError:
+        click.echo(f"No registry at {registry_path}")
+        return
+    except RegistryParseError as e:
+        click.echo(f"Registry parse error: {e}", err=True)
+        sys.exit(1)
+
+    problems: list[str] = []
+
+    known_files = {e.file for e in entries}
+    parent_part_counts: dict[str, set[int]] = {}
+    parent_total_parts: dict[str, set[int]] = {}
+
+    for entry in entries:
+        abs_path = directory / entry.file
+        if not abs_path.exists() and entry.parent_file is None:
+            problems.append(f"missing on disk: {entry.file}")
+
+        if entry.parent_file is not None:
+            if entry.parent_file not in known_files:
+                problems.append(
+                    f"orphan part (parent_file not in registry): {entry.file} "
+                    f"→ {entry.parent_file}"
+                )
+            if entry.part_index is not None:
+                parent_part_counts.setdefault(entry.parent_file, set()).add(entry.part_index)
+            if entry.total_parts is not None:
+                parent_total_parts.setdefault(entry.parent_file, set()).add(entry.total_parts)
+
+    for parent, totals in parent_total_parts.items():
+        if len(totals) > 1:
+            problems.append(
+                f"inconsistent total_parts for {parent}: {sorted(totals)}"
+            )
+        indexes = parent_part_counts.get(parent, set())
+        expected = next(iter(totals)) if len(totals) == 1 else None
+        if expected is not None and indexes != set(range(1, expected + 1)):
+            missing = sorted(set(range(1, expected + 1)) - indexes)
+            if missing:
+                problems.append(
+                    f"missing part indexes for {parent}: {missing} "
+                    f"(have {sorted(indexes)}, expected 1..{expected})"
+                )
+
+    click.echo(f"Entries: {len(entries)}")
+    if not problems:
+        click.echo("✓ registry consistent")
+        return
+
+    click.echo(f"✗ {len(problems)} problem(s):", err=True)
+    for p in problems:
+        click.echo(f"  - {p}", err=True)
+    sys.exit(1)
+
+
+@registry.command(name="prune")
+@click.argument(
+    "directory", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path)
+)
+@click.argument("source_file", type=str)
+@click.option("--dry-run", is_flag=True, help="Show rows that would be removed, then exit")
+def registry_prune(directory: Path, source_file: str, dry_run: bool) -> None:
+    """Remove rows for SOURCE_FILE and any of its split parts.
+
+    SOURCE_FILE is the path as stored in registry.md (relative to DIRECTORY).
+    Does not touch local files or YouTube uploads — markdown only.
+    """
+    from yt_recorder.adapters.registry import MarkdownRegistryStore
+    from yt_recorder.config import load_config
+    from yt_recorder.domain.exceptions import RegistryFileNotFoundError
+
+    config = load_config()
+    registry_path = directory / "registry.md"
+    store = MarkdownRegistryStore(registry_path, [a.name for a in config.accounts])
+
+    try:
+        entries = store.load()
+    except RegistryFileNotFoundError:
+        click.echo(f"No registry at {registry_path}", err=True)
+        sys.exit(1)
+
+    matching = [
+        e for e in entries if e.file == source_file or e.parent_file == source_file
+    ]
+    if not matching:
+        click.echo(f"No rows match '{source_file}'", err=True)
+        sys.exit(1)
+
+    click.echo(f"Matched {len(matching)} row(s):")
+    for e in matching:
+        tag = ""
+        if e.parent_file == source_file:
+            tag = f" (part {e.part_index}/{e.total_parts})"
+        click.echo(f"  - {e.file}{tag}")
+
+    if dry_run:
+        click.echo("(dry-run, no changes)")
+        return
+
+    removed = store.remove_source_and_parts(source_file)
+    click.echo(f"Removed {len(removed)} row(s) from {registry_path}")
 
 
 @main.command(name="reset-limits")
@@ -558,6 +725,39 @@ def health() -> None:
         sys.exit(0)
 
 
+def _upsert_account_in_config(
+    config_path: Path,
+    account: str,
+    storage_state_path: Path,
+) -> None:
+    """Insert/update an account in config.toml.
+
+    Either creates a new ``[accounts.<account>]`` table or updates the
+    ``path`` of an existing one (preserving sibling keys like
+    ``upload_limit_secs`` written by :func:`save_detected_limit`).
+    """
+    import tomlkit
+    from tomlkit.items import Table
+
+    content = config_path.read_text(encoding="utf-8")
+    doc = tomlkit.parse(content)
+
+    if "accounts" not in doc:
+        doc["accounts"] = tomlkit.table()
+    accounts = doc["accounts"]
+
+    existing = accounts.get(account) if hasattr(accounts, "get") else None
+
+    if isinstance(existing, Table):
+        existing["path"] = str(storage_state_path)
+    else:
+        table = tomlkit.table()
+        table["path"] = str(storage_state_path)
+        accounts[account] = table  # type: ignore[index]
+
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+
+
 @main.command()
 @click.option("--account", required=True, help="Account name (e.g., primary, backup)")
 def setup(account: str) -> None:
@@ -640,7 +840,16 @@ def setup(account: str) -> None:
                     browser.close()
                     continue
 
-                context.storage_state(path=str(storage_state_path))
+                # Write storage_state under restrictive umask so the file is
+                # 0o600 from creation. Avoids the TOCTOU window where any local
+                # process could read freshly-minted session cookies between
+                # Playwright creating the file at default umask and the
+                # explicit chmod a few lines below.
+                _prev_umask = os.umask(0o077)
+                try:
+                    context.storage_state(path=str(storage_state_path))
+                finally:
+                    os.umask(_prev_umask)
                 browser.close()
                 break
 
@@ -660,55 +869,14 @@ def setup(account: str) -> None:
         cookies_path=cookies_path,
         output_dir=config_dir / ".tmp",
     )
-    actual_cookies = transcriber.extract_cookies(storage_state_path)
-    shutil.copy2(actual_cookies, cookies_path)
+    transcriber.extract_cookies(storage_state_path)
     os.chmod(cookies_path, 0o600)
 
     config_path = config_dir / "config.toml"
     if not config_path.exists():
         save_config_template(config_path)
 
-    config_lines = config_path.read_text().splitlines()
-
-    account_exists = False
-    new_lines = []
-    for line in config_lines:
-        stripped = line.strip()
-        if stripped.startswith((f"{account} ", f"{account}=")):
-            new_lines.append(f'{account} = "{storage_state_path}"')
-            account_exists = True
-        else:
-            new_lines.append(line)
-
-    if not account_exists:
-        in_accounts = False
-        inserted = False
-        final_lines = []
-        for line in new_lines:
-            if line.strip() == "[accounts]":
-                in_accounts = True
-            elif line.strip().startswith("[") and line.strip() != "[accounts]":
-                if in_accounts and not inserted:
-                    final_lines.append(f'{account} = "{storage_state_path}"')
-                    inserted = True
-                in_accounts = False
-
-            if (
-                in_accounts
-                and not inserted
-                and (line.strip().startswith("#") or line.strip() == "")
-            ):
-                final_lines.append(f'{account} = "{storage_state_path}"')
-                inserted = True
-
-            final_lines.append(line)
-
-        if not inserted:
-            final_lines.append(f'{account} = "{storage_state_path}"')
-
-        new_lines = final_lines
-
-    config_path.write_text("\n".join(new_lines))
+    _upsert_account_in_config(config_path, account, storage_state_path)
 
     gitignore_path = config_dir / ".gitignore"
     gitignore_content = "*_storage_state.json\n*_cookies.txt\nconfig.toml\n"
