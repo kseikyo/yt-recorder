@@ -6,11 +6,13 @@ from pathlib import Path
 
 
 def safe_resolve(base: Path, untrusted: str) -> Path:
-    """Resolve untrusted relative path, reject traversal attacks.
+    """Resolve untrusted relative path, reject traversal and symlink escapes.
 
-    Prevents path traversal vulnerabilities by ensuring the resolved path
-    stays within the base directory. Rejects absolute paths and dotdot
-    traversal attempts.
+    Prevents path traversal by ensuring the resolved path stays within the
+    base directory. Also rejects any path whose nominal location (or any
+    ancestor between ``base`` and the leaf) is a symlink — symlinks pointing
+    outside ``base`` would otherwise smuggle reads/writes onto arbitrary files
+    even though the post-resolve check sees a path inside ``base``.
 
     Args:
         base: Base directory (trusted, must be absolute)
@@ -20,20 +22,29 @@ def safe_resolve(base: Path, untrusted: str) -> Path:
         Resolved absolute path within base directory
 
     Raises:
-        ValueError: If resolved path escapes base directory or is absolute
+        ValueError: If resolved path escapes base, is absolute, or any
+            component is a symlink.
     """
-    # Resolve both paths to absolute form
     base_resolved = base.resolve()
     untrusted_path = Path(untrusted)
 
-    # Reject absolute paths in untrusted input
     if untrusted_path.is_absolute():
         raise ValueError(f"Path traversal rejected: absolute path not allowed: {untrusted}")
 
-    # Resolve the untrusted path relative to base
-    resolved = (base_resolved / untrusted_path).resolve()
+    # Pre-resolve: walk the nominal path component-by-component and refuse if
+    # any segment is a symlink. We have to inspect the *unresolved* path so
+    # that ``Path.resolve`` doesn't silently follow the link before we check.
+    nominal = base_resolved / untrusted_path
+    cursor = base_resolved
+    for part in untrusted_path.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise ValueError(
+                f"Path traversal rejected: {untrusted} contains symlinked component: {cursor}"
+            )
 
-    # Verify resolved path is within base directory
+    resolved = nominal.resolve()
+
     try:
         resolved.relative_to(base_resolved)
     except ValueError:
