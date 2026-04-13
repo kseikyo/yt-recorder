@@ -29,6 +29,7 @@ from yt_recorder.domain.exceptions import (
     VideoTooLongError,
 )
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
+from yt_recorder.log import log_context
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +222,14 @@ class YouTubeBrowserAdapter:
 
     def close(self) -> None:
         if self.context:
-            self.context.storage_state(path=str(self.account.storage_state))
+            # Atomic-ish write under restrictive umask: file is 0o600 from
+            # birth, eliminating the TOCTOU window where a parallel local
+            # process could read fresh session cookies before the chmod.
+            _prev_umask = os.umask(0o077)
+            try:
+                self.context.storage_state(path=str(self.account.storage_state))
+            finally:
+                os.umask(_prev_umask)
             os.chmod(str(self.account.storage_state), 0o600)
             self.context.close()
 
@@ -229,9 +237,18 @@ class YouTubeBrowserAdapter:
         if not self.context:
             raise RuntimeError("Browser not opened. Call open() first.")
 
+        with log_context(
+            yt_op="upload",
+            account=self.account.name,
+            filepath=str(path),
+        ):
+            return self._upload_impl(path, title, description)
+
+    def _upload_impl(self, path: Path, title: str, description: str) -> UploadResult:
+        assert self.context is not None
         page = self.context.new_page()
         try:
-            page.goto(constants.UPLOAD_URL, wait_until="domcontentloaded")
+            page.goto(constants.UPLOAD_URL, wait_until="domcontentloaded", timeout=30_000)
             self._check_session_expired(page)
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
@@ -362,13 +379,22 @@ class YouTubeBrowserAdapter:
             page.close()
 
     def assign_playlist(self, video_id: str, playlist_name: str) -> bool:
+        with log_context(
+            yt_op="assign_playlist",
+            account=self.account.name,
+            video_id=video_id,
+            playlist=playlist_name,
+        ):
+            return self._assign_playlist_impl(video_id, playlist_name)
+
+    def _assign_playlist_impl(self, video_id: str, playlist_name: str) -> bool:
         if not self.context:
             raise RuntimeError("Browser not opened. Call open() first.")
 
         page = self.context.new_page()
         try:
             edit_url = constants.STUDIO_EDIT_URL.format(video_id=video_id)
-            page.goto(edit_url, wait_until="domcontentloaded")
+            page.goto(edit_url, wait_until="domcontentloaded", timeout=30_000)
             self._check_session_expired(page)
             self._check_bot_detection(page)
             self._check_unsupported_browser(page)
