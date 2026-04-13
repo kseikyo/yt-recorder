@@ -265,6 +265,45 @@ yt-recorder follows a **Hexagonal Architecture** (Ports and Adapters) to ensure 
 
 ## Troubleshooting
 
+### Structured logs
+
+Every run writes JSONL records to `~/.config/yt-recorder/logs/yt-recorder.jsonl`
+(or `$XDG_CONFIG_HOME/yt-recorder/logs/yt-recorder.jsonl` if set). Each line is
+one JSON object with `timestamp`, `level`, `logger`, `event`, and any bound
+context (`filepath`, `account`, `part_index`, etc.). Inspect with `jq`:
+
+```bash
+tail -n 50 ~/.config/yt-recorder/logs/yt-recorder.jsonl | jq .
+
+# Just upload failures:
+jq 'select(.level=="error" or .event=="upload_file_failed")' \
+  ~/.config/yt-recorder/logs/yt-recorder.jsonl
+
+# Only records for one file:
+jq 'select(.filepath=="/path/to/video.mp4")' \
+  ~/.config/yt-recorder/logs/yt-recorder.jsonl
+```
+
+Pass `-v/--verbose` to also see DEBUG lines on stderr (file sink is always DEBUG).
+
+### Registry got out of sync
+
+Symptoms: scanner skips a file you expect to upload, or `registry.md` has rows
+for videos that no longer exist on YouTube.
+
+```bash
+# Structural check (no network): finds missing files, bad parent_file refs,
+# part_index/total_parts mismatches.
+yt-recorder registry verify ~/recordings
+
+# Remove all rows for a specific source file (and its split parts):
+yt-recorder registry prune ~/recordings mine/old-video.mp4 --dry-run
+yt-recorder registry prune ~/recordings mine/old-video.mp4
+```
+
+`prune` does not delete the source file or anything on YouTube — only the
+markdown rows. Delete the YouTube videos manually in Studio if needed.
+
 ### "Session expired" error
 
 ```bash
