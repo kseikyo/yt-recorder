@@ -1,17 +1,67 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, TypeVar
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from yt_recorder.adapters.youtube import YouTubeBrowserAdapter
-from yt_recorder.domain.exceptions import DailyLimitError, VideoTooLongError
+from yt_recorder.domain.exceptions import (
+    BotDetectionError,
+    ChannelCreationRequiredError,
+    DailyLimitError,
+    PhoneVerificationRequiredError,
+    UploadTimeoutError,
+    VideoTooLongError,
+)
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
+from yt_recorder.log import log_context
 from yt_recorder.utils import find_chrome
 
 logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
+
+# Backoff schedule for transient failures. Total worst-case added latency: ~5s.
+_RETRY_BACKOFFS_SECS: tuple[float, ...] = (1.0, 4.0)
+
+# Exceptions considered transient (retry worthwhile). Anything else propagates.
+_TRANSIENT_EXCEPTIONS: tuple[type[Exception], ...] = (
+    PlaywrightTimeoutError,
+    UploadTimeoutError,
+)
+
+
+def _retry_transient(op: str, fn: Callable[[], _T]) -> _T:
+    """Call ``fn`` with transient-failure retries.
+
+    Retries on ``_TRANSIENT_EXCEPTIONS``. Business/account exceptions
+    (phone verification, daily limit, bot detection, channel creation,
+    selector changes, etc.) are NOT retried — they propagate on first raise.
+    """
+    last_exc: Exception | None = None
+    for attempt_idx, backoff in enumerate((0.0, *_RETRY_BACKOFFS_SECS)):
+        if backoff > 0.0:
+            logger.warning(
+                "retrying transient failure",
+                extra={
+                    "event": "retry_transient",
+                    "op": op,
+                    "attempt": attempt_idx + 1,
+                    "backoff_secs": backoff,
+                },
+            )
+            time.sleep(backoff)
+        try:
+            return fn()
+        except _TRANSIENT_EXCEPTIONS as exc:
+            last_exc = exc
+            continue
+    assert last_exc is not None
+    raise last_exc
 
 
 class RaidAdapter:
@@ -107,31 +157,73 @@ class RaidAdapter:
         results: dict[str, UploadResult | None] = {}
         playlist_failures = 0
 
-        primary_adapter = self._adapters[self.primary.name]
-        primary_result = primary_adapter.upload(path, title, description=description)
-        results[self.primary.name] = primary_result
-        playlist_ok = primary_adapter.assign_playlist(primary_result.video_id, playlist)
-        if not playlist_ok:
-            logger.warning("Playlist assignment failed for %s on %s", playlist, self.primary.name)
-            playlist_failures += 1
+        with log_context(raid_op="upload", account=self.primary.name):
+            primary_adapter = self._adapters[self.primary.name]
+            primary_result = _retry_transient(
+                "primary_upload",
+                lambda: primary_adapter.upload(path, title, description=description),
+            )
+            results[self.primary.name] = primary_result
+            playlist_ok = _retry_transient(
+                "primary_assign_playlist",
+                lambda: primary_adapter.assign_playlist(primary_result.video_id, playlist),
+            )
+            if not playlist_ok:
+                logger.warning(
+                    "playlist assign failed",
+                    extra={"event": "playlist_assign_failed", "playlist": playlist},
+                )
+                playlist_failures += 1
 
         for mirror in self.mirrors:
-            try:
-                mirror_adapter = self._adapters[mirror.name]
-                mirror_result = mirror_adapter.upload(path, title, description=description)
-                results[mirror.name] = mirror_result
-                playlist_ok = mirror_adapter.assign_playlist(mirror_result.video_id, playlist)
-                if not playlist_ok:
-                    logger.warning("Playlist assignment failed for %s on %s", playlist, mirror.name)
-                    playlist_failures += 1
-            except DailyLimitError as e:
-                logger.warning("Mirror %s daily limit reached: %s", mirror.name, e)
-                results[mirror.name] = None
-            except VideoTooLongError:
-                raise
-            except Exception as e:
-                logger.warning("Mirror %s failed: %s", mirror.name, e)
-                results[mirror.name] = None
+            with log_context(raid_op="upload", account=mirror.name, mirror=True):
+                try:
+                    mirror_adapter = self._adapters[mirror.name]
+
+                    def _do_mirror_upload(
+                        a: YouTubeBrowserAdapter = mirror_adapter,
+                    ) -> UploadResult:
+                        return a.upload(path, title, description=description)
+
+                    mirror_result = _retry_transient("mirror_upload", _do_mirror_upload)
+                    results[mirror.name] = mirror_result
+
+                    def _do_mirror_playlist(
+                        a: YouTubeBrowserAdapter = mirror_adapter,
+                        v: str = mirror_result.video_id,
+                    ) -> bool:
+                        return a.assign_playlist(v, playlist)
+
+                    playlist_ok = _retry_transient(
+                        "mirror_assign_playlist", _do_mirror_playlist
+                    )
+                    if not playlist_ok:
+                        logger.warning(
+                            "playlist assign failed",
+                            extra={"event": "playlist_assign_failed", "playlist": playlist},
+                        )
+                        playlist_failures += 1
+                except DailyLimitError:
+                    logger.warning(
+                        "mirror daily limit reached",
+                        extra={"event": "mirror_daily_limit"},
+                    )
+                    results[mirror.name] = None
+                except VideoTooLongError:
+                    raise
+                except (
+                    PlaywrightTimeoutError,
+                    UploadTimeoutError,
+                    PhoneVerificationRequiredError,
+                    ChannelCreationRequiredError,
+                    BotDetectionError,
+                ):
+                    logger.warning(
+                        "mirror upload failed (transient/account-specific)",
+                        exc_info=True,
+                        extra={"event": "mirror_upload_failed"},
+                    )
+                    results[mirror.name] = None
 
         return results, playlist_failures
 
@@ -154,8 +246,12 @@ class RaidAdapter:
             DailyLimitError: If daily upload limit reached
             ValueError: If account not found
         """
-        adapter = self._adapters[account_name]
-        return adapter.upload(path, title, description=description)
+        with log_context(raid_op="upload_to_account", account=account_name):
+            adapter = self._adapters[account_name]
+            return _retry_transient(
+                "upload_to_account",
+                lambda: adapter.upload(path, title, description=description),
+            )
 
     def assign_playlist_to_account(self, account_name: str, video_id: str, playlist: str) -> bool:
         """Assign playlist on specific account.

@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from yt_recorder.adapters.raid import RaidAdapter
+from yt_recorder.domain.exceptions import UploadTimeoutError
 from yt_recorder.domain.models import UploadResult, YouTubeAccount
 
 
@@ -24,6 +25,8 @@ class TestRaidAdapter:
         monkeypatch.setattr(
             "yt_recorder.adapters.raid.find_chrome", Mock(return_value="/usr/bin/chrome")
         )
+        # Collapse retry backoff so transient-failure tests stay fast
+        monkeypatch.setattr("yt_recorder.adapters.raid._RETRY_BACKOFFS_SECS", ())
         self.mock_playwright_inst = mock_playwright_inst
 
     @pytest.fixture
@@ -130,7 +133,7 @@ class TestRaidAdapter:
             adapter.open = Mock()
             adapter.close = Mock()
             if acct.role == "mirror":
-                adapter.upload = Mock(side_effect=Exception("Upload failed"))
+                adapter.upload = Mock(side_effect=UploadTimeoutError("transient mirror fail"))
             else:
                 adapter.upload = Mock(
                     return_value=UploadResult(
