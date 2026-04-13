@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,9 @@ from yt_recorder.domain.exceptions import (
     TranscriptNotReadyError,
     TranscriptUnavailableError,
 )
+
+# Far-future expiry so the new persistent-cookie health check passes.
+_FUTURE_EXPIRES = int(time.time()) + 86_400 * 365
 
 
 @pytest.fixture
@@ -39,7 +43,7 @@ def storage_state_file(temp_dir: Path) -> Path:
                 "name": "SSID",
                 "value": "test_value_123",
                 "secure": True,
-                "expires": 1735689600,
+                "expires": _FUTURE_EXPIRES,
             },
             {
                 "domain": ".google.com",
@@ -47,7 +51,7 @@ def storage_state_file(temp_dir: Path) -> Path:
                 "name": "NID",
                 "value": "test_nid_456",
                 "secure": False,
-                "expires": 1735689600,
+                "expires": _FUTURE_EXPIRES,
             },
         ]
     }
@@ -82,7 +86,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
 
         video_id = "dQw4w9WgXcQ"
         srt_file = output_dir / f"{video_id}.en.srt"
@@ -101,7 +105,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
 
         video_id = "dQw4w9WgXcQ"
         lang = "es"
@@ -120,7 +124,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
         mock_ydl.download.side_effect = Exception("No captions found")
 
         with pytest.raises(TranscriptUnavailableError):
@@ -134,7 +138,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
         mock_ydl.download.side_effect = Exception("Subtitles not available yet")
 
         with pytest.raises(TranscriptNotReadyError):
@@ -148,7 +152,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
         mock_ydl.download.side_effect = Exception("Cookie authentication failed")
 
         with pytest.raises(SessionExpiredError):
@@ -162,7 +166,7 @@ class TestYtdlpTranscriptAdapter:
         adapter = YtdlpTranscriptAdapter(cookies_file, output_dir)
 
         mock_ydl = MagicMock()
-        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+        mock_ydl_class.return_value = mock_ydl
 
         with pytest.raises(TranscriptUnavailableError):
             adapter.fetch("dQw4w9WgXcQ")
@@ -264,7 +268,7 @@ class TestYtdlpTranscriptAdapter:
                     "name": "secure_cookie",
                     "value": "secure_value",
                     "secure": True,
-                    "expires": 1735689600,
+                    "expires": _FUTURE_EXPIRES,
                 },
                 {
                     "domain": ".example.com",
@@ -272,7 +276,7 @@ class TestYtdlpTranscriptAdapter:
                     "name": "insecure_cookie",
                     "value": "insecure_value",
                     "secure": False,
-                    "expires": 1735689600,
+                    "expires": _FUTURE_EXPIRES,
                 },
             ]
         }
@@ -298,7 +302,7 @@ class TestYtdlpTranscriptAdapter:
                     "name": "cookie1",
                     "value": "value1",
                     "secure": True,
-                    "expires": 1735689600,
+                    "expires": _FUTURE_EXPIRES,
                 },
                 {
                     "domain": "example.com",
@@ -306,7 +310,7 @@ class TestYtdlpTranscriptAdapter:
                     "name": "cookie2",
                     "value": "value2",
                     "secure": False,
-                    "expires": 1735689600,
+                    "expires": _FUTURE_EXPIRES,
                 },
             ]
         }
