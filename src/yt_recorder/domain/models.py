@@ -149,6 +149,10 @@ class SyncReport:
     delete_failed: int = 0
     transcripts_fetched: int = 0
     transcripts_pending: int = 0
+    transcripts_skipped_done: int = 0
+    transcripts_skipped_unavailable: int = 0
+    transcripts_skipped_error: int = 0
+    transcripts_skipped_no_primary_id: int = 0
     playlist_failed: int = 0
     total_registered: int = 0
     account_stats: dict[str, int] = field(default_factory=dict)
