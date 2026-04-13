@@ -6,7 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from yt_recorder.adapters.splitter import TIER_1HR, TIER_15MIN, VideoSplitter
+from yt_recorder.adapters.splitter import (
+    TIER_1HR,
+    TIER_15MIN,
+    VideoSplitter,
+    _compute_ffmpeg_timeout,
+)
 from yt_recorder.domain.exceptions import SplitterError
 
 FFPROBE_JSON_RESPONSE = json.dumps({
@@ -139,7 +144,6 @@ class TestSplit:
         video = tmp_path / "video.mp4"
         video.write_bytes(b"\x00" * 1024)
 
-        # Create fake parts that ffmpeg would produce
         parts_dir = tmp_path / ".video_parts"
         parts_dir.mkdir()
         part0 = parts_dir / "video_part000.mp4"
@@ -150,12 +154,31 @@ class TestSplit:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        with patch.object(splitter, "get_duration", return_value=4000.0):
-            with patch("subprocess.run", return_value=mock_result):
+        # get_duration: first call = source (oversize), then each part (under budget)
+        durations = iter([4000.0, 2000.0, 2000.0])
+        with patch.object(splitter, "get_duration", side_effect=lambda _p: next(durations)):
+            with patch("subprocess.run", return_value=mock_result) as mock_run:
                 result = splitter.split(video, TIER_1HR)
 
         assert len(result) == 2
         assert result == sorted(result)
+
+        argv = mock_run.call_args[0][0]
+        assert "-c:v" in argv
+        assert "libx264" in argv
+        assert "-preset" in argv
+        assert "veryfast" in argv
+        assert "-crf" in argv
+        assert "23" in argv
+        assert "-force_key_frames" in argv
+        assert any(
+            isinstance(a, str) and a.startswith("expr:gte(t,n_forced*") for a in argv
+        )
+        assert "-c:a" in argv
+        assert "copy" in argv
+        # stream-copy-all flag must NOT be present (would reintroduce the keyframe bug)
+        pairs = list(zip(argv, argv[1:]))
+        assert ("-c", "copy") not in pairs
 
     def test_split_raises_when_ffmpeg_not_found(
         self, splitter: VideoSplitter, fake_video: Path
@@ -165,7 +188,7 @@ class TestSplit:
                 with pytest.raises(SplitterError, match="ffmpeg not found"):
                     splitter.split(fake_video, TIER_1HR)
 
-    def test_split_ffmpeg_timeout_passed(
+    def test_split_ffmpeg_timeout_scales_with_duration(
         self, splitter: VideoSplitter, tmp_path: Path
     ) -> None:
         video = tmp_path / "video.mp4"
@@ -179,12 +202,43 @@ class TestSplit:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        with patch.object(splitter, "get_duration", return_value=4000.0):
+        durations = iter([4000.0, 800.0])
+        with patch.object(splitter, "get_duration", side_effect=lambda _p: next(durations)):
             with patch("subprocess.run", return_value=mock_result) as mock_run:
                 splitter.split(video, TIER_1HR)
 
         _, kwargs = mock_run.call_args
-        assert kwargs.get("timeout") == 120
+        timeout = kwargs.get("timeout")
+        assert timeout is not None
+        assert timeout >= 600
+        assert timeout == _compute_ffmpeg_timeout(4000.0)
+
+    def test_split_raises_when_part_exceeds_threshold(
+        self, splitter: VideoSplitter, tmp_path: Path
+    ) -> None:
+        video = tmp_path / "video.mp4"
+        video.write_bytes(b"\x00" * 1024)
+
+        parts_dir = tmp_path / ".video_parts"
+        parts_dir.mkdir()
+        part0 = parts_dir / "video_part000.mp4"
+        part1 = parts_dir / "video_part001.mp4"
+        part0.write_bytes(b"\x00" * 512)
+        part1.write_bytes(b"\x00" * 512)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        # Source duration oversize, first part under budget, second part oversize
+        durations = iter([4000.0, 800.0, 1200.0])
+        with patch.object(splitter, "get_duration", side_effect=lambda _p: next(durations)):
+            with patch("subprocess.run", return_value=mock_result):
+                with pytest.raises(SplitterError, match="oversize part"):
+                    splitter.split(video, TIER_15MIN)
+
+        # cleanup should have removed the temp parts dir
+        assert not part0.exists()
+        assert not part1.exists()
 
 
 class TestGetMetadata:
