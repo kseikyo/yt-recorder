@@ -74,9 +74,17 @@ def load_config(config_path: Path | None = None) -> Config:
     if "accounts" in data:
         from yt_recorder.domain.models import YouTubeAccount
 
+        # The account literally named "primary" wins the primary role regardless
+        # of file order. Falls back to the first account otherwise (legacy configs
+        # that pre-date the named convention).
+        account_items = list(data["accounts"].items())
+        primary_name = "primary" if any(n == "primary" for n, _ in account_items) else (
+            account_items[0][0] if account_items else None
+        )
+
         accounts = []
-        for i, (name, value) in enumerate(data["accounts"].items()):
-            role = "primary" if i == 0 else "mirror"
+        for name, value in account_items:
+            role = "primary" if name == primary_name else "mirror"
             if isinstance(value, str):
                 account = YouTubeAccount(
                     name=name,
