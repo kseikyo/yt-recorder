@@ -23,6 +23,18 @@ _V1_TRANSCRIPT_MAP: dict[str, TranscriptStatus] = {
     "❌": TranscriptStatus.PENDING,
 }
 
+# Characters that would corrupt the markdown table on next parse, or smuggle
+# extra rows / sections into registry.md when an attacker controls a filename.
+_REGISTRY_FORBIDDEN_CHARS: tuple[str, ...] = ("|", "\n", "\r", "\x00")
+
+
+def _validate_registry_field(value: str, field_name: str) -> None:
+    if any(c in value for c in _REGISTRY_FORBIDDEN_CHARS):
+        forbidden = ", ".join(repr(c) for c in _REGISTRY_FORBIDDEN_CHARS)
+        raise RegistryWriteError(
+            f"Invalid {field_name} {value!r}: contains forbidden characters ({forbidden})"
+        )
+
 
 class MarkdownRegistryStore:
     """Markdown-based registry store with dynamic account columns.
@@ -114,6 +126,13 @@ class MarkdownRegistryStore:
         Raises:
             RegistryWriteError: If write fails
         """
+        _validate_registry_field(entry.file, "file")
+        if entry.parent_file is not None:
+            _validate_registry_field(entry.parent_file, "parent_file")
+        _validate_registry_field(entry.playlist, "playlist")
+        for acct, vid in entry.account_ids.items():
+            _validate_registry_field(acct, "account name")
+            _validate_registry_field(vid, "video id")
         try:
             with self._locked():
                 if not self.registry_path.exists():
@@ -209,6 +228,32 @@ class MarkdownRegistryStore:
                         account_ids=fields.get("account_ids", entry.account_ids),
                     )
             self._write_all(entries)
+
+    def remove_source_and_parts(self, source_file: str) -> list[RegistryEntry]:
+        """Remove registry rows for a source file and any of its split parts.
+
+        Matches rows where ``entry.file == source_file`` OR
+        ``entry.parent_file == source_file``. Used by ``yt-recorder registry
+        prune`` for manual recovery when the registry drifts from YouTube.
+
+        Returns the list of entries that were removed (caller can log them).
+        Does NOT touch local files or YouTube uploads.
+        """
+        with self._locked():
+            try:
+                entries = self.load()
+            except RegistryFileNotFoundError:
+                return []
+            removed = [
+                e
+                for e in entries
+                if e.file == source_file or e.parent_file == source_file
+            ]
+            if not removed:
+                return []
+            kept = [e for e in entries if e not in removed]
+            self._write_all(kept)
+            return removed
 
     def is_registered(self, relative_path: str) -> bool:
         """Check if file is registered.
