@@ -393,12 +393,15 @@ class TestFetchTranscripts:
 
         assert report.transcripts_fetched == 2
 
-    def test_no_primary_account(
+    def test_mirror_only_config_uses_mirror_transcriber(
         self,
         mock_registry: Mock,
         mock_raid: Mock,
         tmp_path: Path,
     ) -> None:
+        # Multi-account fallback: a config with only a mirror account is fine,
+        # the mirror's transcriber gets used. Pre-fallback this errored with
+        # "No primary account".
         config = Config(
             accounts=[
                 YouTubeAccount("mirror", Path("/tmp/m.json"), Path("/tmp/m.txt"), "mirror"),
@@ -407,9 +410,12 @@ class TestFetchTranscripts:
         transcriber = Mock()
         pipeline = RecordingPipeline(config, mock_registry, mock_raid, transcriber)
 
+        # Empty registry → no entries to fetch → no errors, just a clean report.
+        mock_registry.load.return_value = []
         report = pipeline.fetch_transcripts(tmp_path)
 
-        assert "No primary account" in report.errors[0]
+        assert report.errors == []
+        assert report.transcripts_fetched == 0
 
     def test_no_transcriber(
         self,
